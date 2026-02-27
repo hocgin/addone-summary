@@ -14,6 +14,9 @@ function extractPageContent(): string {
     }
   })
 
+  // 移除所有脚本和样式
+  clone.querySelectorAll('script, style, noscript, iframe, svg').forEach(el => el.remove())
+
   const text = clone.innerText
     .replace(/\s+/g, ' ')
     .trim()

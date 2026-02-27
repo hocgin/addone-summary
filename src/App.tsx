@@ -28,6 +28,8 @@ function App() {
   const [needsSetup, setNeedsSetup] = useState(false)
   const listenerRef = useRef<((message: ProgressUpdate | any) => void) | null>(null)
 
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false)
+
   const handleProgressMessage = useCallback((message: ProgressUpdate | any) => {
     if (message.type === 'PROGRESS_UPDATE') {
       console.log('收到进度更新:', message)
@@ -41,10 +43,25 @@ function App() {
     } else if (message.type === 'GENERATION_PROGRESS') {
       console.log('收到生成进度:', message)
       setProgress(message.progress)
+    } else if (message.type === 'MODEL_PROGRESS') {
+      // 收到模型初始化进度，显示加载界面
+      if (status === 'idle' && !isModelLoaded) {
+        setStatus('loading')
+        setMessage('正在初始化模型...')
+      }
+      setProgress(message.progress)
+      if (message.stage) setStage(message.stage)
     }
-  }, [])
+  }, [status, isModelLoaded])
 
   useEffect(() => {
+    // 检查 onboarding 状态
+    chrome.storage.local.get(['onboardingCompleted'], (result) => {
+      const completed = !!result.onboardingCompleted
+      setOnboardingCompleted(completed)
+      setNeedsSetup(!completed)
+    })
+
     // 移除旧的监听器
     if (listenerRef.current) {
       chrome.runtime.onMessage.removeListener(listenerRef.current)
@@ -57,15 +74,8 @@ function App() {
     // 检查模型状态
     chrome.runtime.sendMessage({ type: 'CHECK_MODEL_STATUS' }, (response) => {
       setIsCheckingModel(false)
-
-      if (chrome.runtime.lastError) {
-        console.log('无法连接到 background，可能还在初始化')
-        setNeedsSetup(true)
-      } else if (response?.isModelLoaded) {
+      if (response?.isModelLoaded) {
         setIsModelLoaded(true)
-        setNeedsSetup(false)
-      } else {
-        setNeedsSetup(true)
       }
     })
 
@@ -152,7 +162,11 @@ function App() {
   return (
     <div className="app-container">
       {status === 'idle' && !needsSetup && (
-        <WelcomeView onStart={handleSummarize} isModelLoaded={isModelLoaded} />
+        <WelcomeView 
+          onStart={handleSummarize} 
+          isModelLoaded={isModelLoaded} 
+          canStart={onboardingCompleted}
+        />
       )}
       {status === 'loading' && (
         <LoadingView progress={progress} message={message} stage={stage} details={details} />

@@ -183,7 +183,7 @@ export class WebLLMManager {
       console.error('Failed to parse summary:', error)
       console.log('Raw response:', response)
       return {
-        abstract: response.replace(/```(?:json)?|```/g, '').trim().slice(0, 500),
+        abstract: response.replace(/```(?:json)?|```/g, '').trim(),
         keyPoints: [],
         topics: [],
         sentiment: 'neutral',

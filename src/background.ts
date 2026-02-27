@@ -97,30 +97,24 @@ function sendProgressToPopup(
 // 导出以避免 unused 警告，后续实现摘要功能时会用到
 export { sendProgressToPopup }
 
-// 转发来自 offscreen document 的进度消息到所有扩展页面
-chrome.runtime.onMessage.addListener((message, sender) => {
-  // 只处理来自 offscreen document 的进度消息
-  // 检查 sender.url 是否包含 offscreen.html
+// 统一的消息监听器
+chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendResponse) => {
+  // 1. 处理来自 offscreen 的进度消息转发
   if (sender.url && sender.url.includes('offscreen.html')) {
     if (message.type === 'MODEL_PROGRESS') {
-      // 转发到所有监听的页面（如 onboarding 页面）
       chrome.runtime.sendMessage(message).catch(() => {
         console.log('[Background] 转发进度消息失败（可能没有监听器）')
       })
     }
+    // 不返回 true，因为不需要向 offscreen 发送响应
   }
-  return false
-})
 
-// 统一的消息监听器
-chrome.runtime.onMessage.addListener(
-  async (message: ChromeMessage, _sender, sendResponse) => {
-    console.log('[Background] 收到消息:', message.type)
+  console.log('[Background] 收到消息:', message.type)
 
-    // 处理打开引导页面请求
-    if (message.type === 'OPEN_ONBOARDING') {
+  // 2. 处理打开引导页面请求
+  if (message.type === 'OPEN_ONBOARDING') {
+    chrome.storage.local.get(['onboardingCompleted']).then(async (result) => {
       try {
-        const result = await chrome.storage.local.get(['onboardingCompleted'])
         if (!result.onboardingCompleted) {
           await chrome.tabs.create({
             url: chrome.runtime.getURL('src/onboarding.html'),
@@ -132,46 +126,62 @@ chrome.runtime.onMessage.addListener(
         console.error('Failed to open onboarding:', error)
         sendResponse({ success: false, error: String(error) })
       }
-      return true
-    }
+    })
+    return true
+  }
 
-    // 处理模型状态检查
-    if (message.type === 'CHECK_MODEL_STATUS') {
-      sendResponse({ isModelLoaded: false })
-      return true
-    }
+  // 3. 处理模型状态检查
+  if (message.type === 'CHECK_MODEL_STATUS') {
+    ensureOffscreenDocument().then(async (offscreenReady) => {
+      try {
+        if (!offscreenReady) {
+          sendResponse({ isModelLoaded: false })
+          return
+        }
 
-    // 处理 WebGPU 检查
-    if (message.type === 'CHECK_WEBGPU') {
-      const supported = checkWebGPUAvailability()
+        const response = await chrome.runtime.sendMessage({
+          type: 'CHECK_STATUS'
+        }).catch(() => null)
+
+        sendResponse({ isModelLoaded: response?.isReady || false })
+      } catch (error) {
+        sendResponse({ isModelLoaded: false })
+      }
+    })
+    return true
+  }
+
+  // 4. 处理 WebGPU 检查
+  if (message.type === 'CHECK_WEBGPU') {
+    const supported = checkWebGPUAvailability()
+    sendResponse({
+      supported,
+      message: supported ? '设备支持 WebGPU' : '设备不支持 WebGPU'
+    })
+    return true
+  }
+
+  // 5. 处理模型初始化（来自 onboarding 页面）
+  if (message.type === 'INITIALIZE_MODEL') {
+    console.log('[Background] 处理 INITIALIZE_MODEL 请求')
+
+    // 检查 offscreen API 支持
+    if (!isOffscreenAPISupported()) {
       sendResponse({
-        supported,
-        message: supported ? '设备支持 WebGPU' : '设备不支持 WebGPU'
+        success: false,
+        error: '您的浏览器不支持 Offscreen API。请使用 Chrome 109 或更高版本。'
       })
       return true
     }
 
-    // 处理模型初始化（来自 onboarding 页面）
-    if (message.type === 'INITIALIZE_MODEL') {
-      console.log('[Background] 处理 INITIALIZE_MODEL 请求')
-
-      // 检查 offscreen API 支持
-      if (!isOffscreenAPISupported()) {
-        sendResponse({
-          success: false,
-          error: '您的浏览器不支持 Offscreen API。请使用 Chrome 109 或更高版本。'
-        })
-        return true
-      }
-
+    ensureOffscreenDocument().then(async (offscreenReady) => {
       try {
-        const offscreenReady = await ensureOffscreenDocument()
         if (!offscreenReady) {
           sendResponse({
             success: false,
             error: '无法创建 offscreen document，请查看控制台了解详情'
           })
-          return true
+          return
         }
 
         // 转发消息到 offscreen document
@@ -187,18 +197,22 @@ chrome.runtime.onMessage.addListener(
           error: error instanceof Error ? error.message : ERROR_MESSAGES.MODEL_LOAD_FAILED
         })
       }
-      return true
-    }
+    })
+    return true
+  }
 
-    // 处理模型预加载
-    if (message.type === 'PRELOAD_MODEL') {
-      sendResponse({ success: false, error: '请使用 onboarding 页面进行模型下载' })
-      return true
-    }
+  // 6. 处理模型预加载
+  if (message.type === 'PRELOAD_MODEL') {
+    sendResponse({ success: false, error: '请使用 onboarding 页面进行模型下载' })
+    return true
+  }
 
-    // 处理页面摘要
-    if (message.type === 'SUMMARIZE_PAGE') {
-      console.log('[Background] 处理 SUMMARIZE_PAGE')
+  // 7. 处理页面摘要
+  if (message.type === 'SUMMARIZE_PAGE') {
+    console.log('[Background] 处理 SUMMARIZE_PAGE')
+    
+    // 使用立即执行的异步函数来处理逻辑
+    ;(async () => {
       try {
         // 1. 确保 Offscreen document 存在
         const offscreenReady = await ensureOffscreenDocument()
@@ -215,11 +229,16 @@ chrome.runtime.onMessage.addListener(
         })
 
         if (!statusResponse || !statusResponse.isReady) {
-          sendResponse({
-            success: false,
-            error: ERROR_MESSAGES.MODEL_NOT_READY
-          } as SummarizeResponse)
-          return true
+          console.log('[Background] 模型未就绪，尝试自动初始化...')
+          
+          // 尝试初始化
+          const initResponse = await chrome.runtime.sendMessage({
+            type: 'INITIALIZE_MODEL'
+          }).catch(err => ({ success: false, error: err.message })) as { success: boolean; error?: string }
+
+          if (!initResponse.success) {
+            throw new Error(initResponse.error || ERROR_MESSAGES.MODEL_LOAD_FAILED)
+          }
         }
 
         // 3. 获取当前活动标签页
@@ -229,12 +248,42 @@ chrome.runtime.onMessage.addListener(
         }
 
         // 4. 提取页面内容
-        const extractionResponse = await chrome.tabs.sendMessage(activeTab.id, {
-          type: 'EXTRACT_CONTENT'
-        }).catch((err) => {
-          console.error('[Background] 提取内容失败:', err)
-          return null
-        }) as { type: string; text: string } | null
+        let extractionResponse = null
+        try {
+          extractionResponse = await chrome.tabs.sendMessage(activeTab.id, {
+            type: 'EXTRACT_CONTENT'
+          })
+        } catch (err) {
+          console.error('[Background] 提取内容失败 (sendMessage error):', err)
+          // 如果 content script 未加载，尝试注入
+          console.log('[Background] 尝试注入 content script...')
+          
+          // 检查 URL 是否支持注入
+          if (!activeTab.url?.startsWith('http')) {
+            throw new Error('无法在当前页面生成摘要（不支持的 URL 协议）')
+          }
+
+          await chrome.scripting.executeScript({
+            target: { tabId: activeTab.id },
+            files: ['src/content-scripts/extractor.ts']
+          }).catch(e => {
+            console.error('注入脚本失败:', e)
+            throw e
+          })
+          
+          // 等待脚本执行和监听器注册
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          // 再次尝试发送消息
+          try {
+            extractionResponse = await chrome.tabs.sendMessage(activeTab.id, {
+              type: 'EXTRACT_CONTENT'
+            })
+          } catch (retryErr) {
+            console.error('[Background] 重试提取内容失败:', retryErr)
+            throw retryErr
+          }
+        }
 
         if (!extractionResponse || !extractionResponse.text) {
           throw new Error(ERROR_MESSAGES.EXTRACTION_FAILED)
@@ -269,12 +318,13 @@ chrome.runtime.onMessage.addListener(
           error: error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN
         } as SummarizeResponse)
       }
-      return true
-    }
-
-    return false
+    })()
+    
+    return true
   }
-)
+
+  return false
+})
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('WebLLM-X Extension installed:', details.reason)

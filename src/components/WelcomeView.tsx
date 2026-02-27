@@ -4,9 +4,10 @@ import './WelcomeView.css'
 interface WelcomeViewProps {
   onStart: () => void
   isModelLoaded: boolean
+  canStart: boolean
 }
 
-export const WelcomeView: React.FC<WelcomeViewProps> = ({ onStart, isModelLoaded }) => {
+export const WelcomeView: React.FC<WelcomeViewProps> = ({ onStart, isModelLoaded, canStart }) => {
   return (
     <div className="welcome-view">
       <div className="welcome-header">
@@ -39,11 +40,15 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({ onStart, isModelLoaded
         </div>
       </div>
 
-      <button className="start-button" onClick={onStart} disabled={!isModelLoaded}>
-        {isModelLoaded ? '开始分析' : '模型初始化中...'}
+      <button className="start-button" onClick={onStart} disabled={!canStart}>
+        {canStart ? '开始分析' : '请先完成设置'}
       </button>
 
-      {!isModelLoaded && (
+      {!isModelLoaded && canStart && (
+        <p className="loading-hint">点击开始后将自动加载模型</p>
+      )}
+      
+      {!canStart && (
         <p className="loading-hint">首次使用需要下载 AI 模型（约 1GB）</p>
       )}
     </div>
