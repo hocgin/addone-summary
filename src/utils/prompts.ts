@@ -1,15 +1,13 @@
 /**
  * 根据语言获取提示词
  */
-function getPromptsForLanguage(language: string) {
-  // 中文语言
-  if (language.startsWith('zh')) {
+function getPromptsForLanguage(_language: string) {
     return {
-      system: `你是一个网页内容分析助手。你的任务是将网页内容分析并生成 JSON 格式的摘要。
+        system: `你是一个网页内容分析助手。你的任务是将网页内容分析并生成 JSON 格式的摘要。
 
 重要：必须用中文生成所有字段的内容。必须返回 JSON，不能包含其他文字。`,
 
-      user: (text: string) => `分析下面的内容，生成 JSON 格式的中文摘要。
+        user: (text: string) => `分析下面的内容，生成 JSON 格式的中文摘要。
 
 返回格式要求：
 {
@@ -32,37 +30,6 @@ ${text}
 
 只返回 JSON，不要其他内容。结果用<json>和</json>标签包围。`
     }
-  }
-
-  // 英文语言（默认）
-  return {
-    system: `You are a web content analysis assistant. Your task is to analyze web content and generate a JSON-formatted summary.
-
-Important: You must generate all field content in English. You must return JSON only, with no other text.`,
-
-    user: (text: string) => `Analyze the following content and generate a JSON-formatted summary in English.
-
-Return format:
-{
-  "abstract": "Two-sentence summary",
-  "keyPoints": ["point 1", "point 2", "point 3"],
-  "topics": ["topic1", "topic2"],
-  "sentiment": "positive",
-  "confidence": 0.8
-}
-
-Field descriptions:
-- abstract: Accurately summarize the core content in 2 sentences
-- keyPoints: Extract 3-5 most important key points, keep each concise
-- topics: Extract 3-5 representative topic tags
-- sentiment: Sentiment, must be either positive, neutral, or negative
-- confidence: A number between 0 and 1 indicating analysis confidence
-
-Content:
-${text}
-
-Return JSON only, with no other content. Wrap the result in <json> and </json> tags.`
-  }
 }
 
 /**
