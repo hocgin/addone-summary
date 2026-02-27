@@ -6,6 +6,7 @@ import { Prompts } from '../utils/prompts'
 import {
     ChatCompletionRequestStreaming
 } from "@mlc-ai/web-llm/lib/openai_api_protocols/chat_completion";
+import { Type, Static } from "@sinclair/typebox";
 
 export class WebLLMManager {
   private static instance: WebLLMManager | null = null
@@ -114,29 +115,58 @@ export class WebLLMManager {
     if (!this.engine || !this.isInitialized) {
       throw new Error('WebLLM engine not initialized')
     }
+      // 定义 JSON 结构的 schema
+      const WebPageSummarySchemaT = Type.Object({
+          abstract: Type.String({ description: "网页内容的简明摘要" }),
+          keyPoints: Type.Array(Type.String(), { description: "关键要点列表" }),
+          topics: Type.Array(Type.String(), { description: "涉及的主题标签" }),
+          sentiment: Type.Union([
+              Type.Literal("positive"),
+              Type.Literal("negative"),
+              Type.Literal("neutral")
+          ], { description: "情感倾向" }),
+          confidence: Type.Number({
+              minimum: 0,
+              maximum: 1,
+              description: "模型对结果的置信度（0~1）"
+          })
+      });
+      type WebPageSummarySchemaT = Static<typeof WebPageSummarySchemaT>;
+      const schema = JSON.stringify(WebPageSummarySchemaT);
 
     try {
       const prompt = Prompts.User.SUMMARIZE(text)
 
       progressCallback?.(0)
 
-        const request: ChatCompletionRequestStreaming = {
-            messages: [
-                {
-                    role: 'system',
-                    content: Prompts.System.DEFAULT
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            // max_tokens: 1000,
-            temperature: 0.7,
-            stream: true
-        };
-        console.log('request = ', request);
-        const chunks = await this.engine.chat.completions.create(request)
+      const request: ChatCompletionRequestStreaming = {
+        messages: [
+          {
+            role: 'system',
+            content: Prompts.System.DEFAULT
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,  // 降低温度以获得更确定性的输出
+        stream: true,
+          response_format: {
+              type: "json_object",
+              schema: schema,
+          } as webllm.ResponseFormat,
+      };
+
+      console.log('[WebLLM] 请求配置:', {
+        temperature: request.temperature,
+        response_format: request.response_format,
+        hasSystem: !!request.messages[0]?.content,
+        hasUser: !!request.messages[1]?.content,
+        promptLength: prompt.length
+      })
+
+      const chunks = await this.engine.chat.completions.create(request)
 
       let fullResponse = ''
       let chunkCount = 0

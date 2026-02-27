@@ -1,24 +1,24 @@
 /**
+ * 获取用户系统语言名称（用于提示词）
+ */
+function getLanguageName(systemLanguage: string): string {
+  if (systemLanguage.startsWith('zh')) {
+    return 'Chinese'
+  }
+  return 'English'
+}
+
+/**
  * 根据用户系统语言获取提示词
  */
 function getPromptsForLanguage(systemLanguage: string) {
+  const langName = getLanguageName(systemLanguage)
+
   return {
-    system: `You are a web content analyzer. Analyze content in ${systemLanguage} and output JSON.`,
-    user: (text: string) => `Analyze content in ${systemLanguage} and output JSON.
+    system: `You are a web content analyzer. Analyze and output JSON.`,
 
-Response JSON format:
-{
-  "abstract": "summary",
-  "keyPoints": ["points"],
-  "topics": ["topics"],
-  "sentiment": "positive",
-  "confidence": 0.8
-}
-
-Content:
-${text}
-
-Requirement: Analyze in ${systemLanguage}, output JSON only.`
+    user: (text: string) => `Analyze the content in ${langName}.
+${text}`
   }
 }
 
@@ -53,6 +53,7 @@ export const Prompts = {
   User: {
     SUMMARIZE: (text: string) => {
       const lang = getUserLanguage()
+      console.log('[Prompts] 生成摘要，系统语言:', lang)
       return getPromptsForLanguage(lang).user(text)
     }
   }
