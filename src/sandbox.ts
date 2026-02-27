@@ -10,12 +10,17 @@ postMessage('READY', {})
 
 // 日志函数
 function log(message: string, type: 'info' | 'error' | 'success' = 'info') {
-  const logDiv = document.getElementById('log')!
-  const logItem = document.createElement('div')
-  logItem.className = `log-item ${type}`
-  logItem.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
-  logDiv.appendChild(logItem)
   console.log(`[Sandbox] ${message}`)
+
+  const statusDiv = document.getElementById('status')!
+  const statusDetail = document.getElementById('status-detail')!
+
+  statusDiv.className = `status ${type}`
+  statusDetail.textContent = message
+
+  if (type === 'success') {
+    statusDiv.classList.add('ready')
+  }
 }
 
 // 发送消息到父窗口
