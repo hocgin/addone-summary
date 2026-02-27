@@ -135,7 +135,7 @@ export class WebLLMManager {
             temperature: 0.7,
             stream: true
         };
-        console.log('request = ', JSON.stringify(request));
+        console.log('request = ', request);
         const chunks = await this.engine.chat.completions.create(request)
 
       let fullResponse = ''
