@@ -303,6 +303,7 @@ export class WebLLMManager {
     const hasTopics = Array.isArray(data.topics)
     const hasSentiment = ['positive', 'neutral', 'negative'].includes(data.sentiment)
     const hasConfidence = typeof data.confidence === 'number'
+    // language 字段是可选的，不强求验证
 
     const isValid = hasAbstract && hasKeyPoints && hasTopics && hasSentiment && hasConfidence
 
