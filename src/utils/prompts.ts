@@ -6,7 +6,7 @@ function getPromptsForLanguage(systemLanguage: string) {
     system: `You are a web content analyzer. Analyze content in ${systemLanguage} and output JSON.`,
     user: (text: string) => `Analyze content in ${systemLanguage} and output JSON.
 
-JSON format:
+Response JSON format:
 {
   "abstract": "summary",
   "keyPoints": ["points"],
