@@ -13,6 +13,7 @@ type Status = 'idle' | 'loading' | 'done' | 'error'
 interface PageInfo {
   title: string
   url: string
+  isSupported: boolean
 }
 
 function SidePanelApp() {
@@ -34,7 +35,7 @@ function SidePanelApp() {
   const listenerRef = useRef<((message: ProgressUpdate | any) => void) | null>(null)
 
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
-  const [pageInfo, setPageInfo] = useState<PageInfo>({ title: '', url: '' })
+  const [pageInfo, setPageInfo] = useState<PageInfo>({ title: '', url: '', isSupported: true })
 
   const handleProgressMessage = useCallback((message: ProgressUpdate | any) => {
     if (message.type === 'PROGRESS_UPDATE') {
@@ -129,10 +130,21 @@ function SidePanelApp() {
     // 获取当前活动标签页信息
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
+        const url = tabs[0].url || ''
+        // 检查是否是受支持的 URL
+        const isSupported = url.startsWith('http://') || url.startsWith('https://')
+
         setPageInfo({
           title: tabs[0].title || '未知页面',
-          url: tabs[0].url || ''
+          url,
+          isSupported
         })
+
+        // 如果页面不支持，设置错误状态
+        if (!isSupported) {
+          setError('当前页面不支持内容分析。请在普通的网页（如新闻、博客等）上使用此功能。\n\n支持的页面：以 http:// 或 https:// 开头的网页')
+          setStatus('error')
+        }
       }
     })
 
@@ -205,14 +217,15 @@ function SidePanelApp() {
         <WelcomeView
           onStart={handleSummarize}
           isModelLoaded={isModelLoaded}
-          canStart={onboardingCompleted}
+          canStart={onboardingCompleted && pageInfo.isSupported}
+          isPageSupported={pageInfo.isSupported}
         />
       )}
       {status === 'loading' && (
         <LoadingView progress={progress} message={message} stage={stage} details={details} />
       )}
       {status === 'done' && summary && (
-        <SummaryView data={summary} onReset={handleReset} />
+        <SummaryView data={summary} onReset={handleReset} onRetry={handleSummarize} />
       )}
       {status === 'error' && (
         <ErrorView error={error} onRetry={handleSummarize} />

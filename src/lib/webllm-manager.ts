@@ -128,7 +128,7 @@ export class WebLLMManager {
             content: prompt
           }
         ],
-        max_tokens: 1000,
+        // max_tokens: 1000,
         temperature: 0.7,
         stream: true
       })
@@ -140,7 +140,7 @@ export class WebLLMManager {
         const content = chunk.choices[0]?.delta?.content || ''
         fullResponse += content
         chunkCount++
-        
+
         // 估算进度，假设大概 50-100 个 chunk
         const estimatedProgress = Math.min(Math.round(chunkCount * 1.5), 95)
         progressCallback?.(estimatedProgress)

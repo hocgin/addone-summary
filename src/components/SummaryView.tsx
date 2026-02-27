@@ -5,6 +5,7 @@ import './SummaryView.css'
 interface SummaryViewProps {
   data: StructuredSummary & { title?: string; url?: string }
   onReset: () => void
+  onRetry: () => void
 }
 
 const getSentimentIcon = (sentiment: string): string => {
@@ -40,7 +41,7 @@ const getSentimentClass = (sentiment: string): string => {
   }
 }
 
-export const SummaryView: React.FC<SummaryViewProps> = ({ data, onReset }) => {
+export const SummaryView: React.FC<SummaryViewProps> = ({ data, onReset, onRetry }) => {
   const handleCopy = async () => {
     const text = `
 # ${data.title || '网页摘要'}
@@ -128,6 +129,17 @@ ${getSentimentLabel(data.sentiment)} (可信度: ${Math.round(data.confidence * 
             </span>
           </div>
         </section>
+      </div>
+
+      {/* 底部操作栏 */}
+      <div className="summary-footer">
+        <button className="retry-button" onClick={onRetry}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          重新生成
+        </button>
       </div>
     </div>
   )

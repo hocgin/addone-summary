@@ -67,10 +67,11 @@ function App() {
 
   return (
     <div className="app-container">
-       <WelcomeView 
-          onStart={handleOpenSidePanel} 
-          isModelLoaded={isModelLoaded} 
+       <WelcomeView
+          onStart={handleOpenSidePanel}
+          isModelLoaded={isModelLoaded}
           canStart={onboardingCompleted}
+          isPageSupported={true}
         />
     </div>
   )

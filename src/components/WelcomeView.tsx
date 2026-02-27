@@ -5,9 +5,29 @@ interface WelcomeViewProps {
   onStart: () => void
   isModelLoaded: boolean
   canStart: boolean
+  isPageSupported: boolean
 }
 
-export const WelcomeView: React.FC<WelcomeViewProps> = ({ onStart, isModelLoaded, canStart }) => {
+export const WelcomeView: React.FC<WelcomeViewProps> = ({ onStart, isModelLoaded, canStart, isPageSupported }) => {
+  const getButtonText = () => {
+    if (!isPageSupported) return '当前页面不支持'
+    if (!canStart) return '请先完成设置'
+    return '开始分析'
+  }
+
+  const getHintText = () => {
+    if (!isPageSupported) {
+      return '请在普通网页上使用此功能（例如：新闻网站、博客等）'
+    }
+    if (!isModelLoaded && canStart) {
+      return '点击开始后将自动加载模型'
+    }
+    if (!canStart) {
+      return '首次使用需要下载 AI 模型（约 1GB）'
+    }
+    return null
+  }
+
   return (
     <div className="welcome-view">
       <div className="welcome-header">
@@ -40,16 +60,16 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({ onStart, isModelLoaded
         </div>
       </div>
 
-      <button className="start-button" onClick={onStart} disabled={!canStart}>
-        {canStart ? '开始分析' : '请先完成设置'}
+      <button
+        className="start-button"
+        onClick={onStart}
+        disabled={!canStart || !isPageSupported}
+      >
+        {getButtonText()}
       </button>
 
-      {!isModelLoaded && canStart && (
-        <p className="loading-hint">点击开始后将自动加载模型</p>
-      )}
-      
-      {!canStart && (
-        <p className="loading-hint">首次使用需要下载 AI 模型（约 1GB）</p>
+      {getHintText() && (
+        <p className="loading-hint">{getHintText()}</p>
       )}
     </div>
   )
