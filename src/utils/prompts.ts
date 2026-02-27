@@ -11,7 +11,7 @@ function getPromptsForLanguage(_language: string) {
 
 返回格式要求：
 {
-  "abstract": "两句话摘要",
+  "abstract": "按照 5W1H 准确概括内容",
   "keyPoints": ["要点1", "要点2", "要点3"],
   "topics": ["话题1", "话题2"],
   "sentiment": "positive",
@@ -19,7 +19,7 @@ function getPromptsForLanguage(_language: string) {
 }
 
 字段说明：
-- abstract: 按照“5W1H”准确概括内容核心
+- abstract: 按照 5W1H 准确概括内容
 - keyPoints: 提取3-5个最重要的关键点，每个要点简洁
 - topics: 提炼3-5个代表性话题标签
 - sentiment: 情感倾向，只能是 positive 或 neutral 或 negative
