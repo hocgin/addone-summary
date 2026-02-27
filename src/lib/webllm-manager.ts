@@ -3,6 +3,10 @@ import { jsonrepair } from 'jsonrepair'
 import type { StructuredSummary, WebLLMProgress } from '../types'
 import { DEFAULT_MODEL, ERROR_MESSAGES } from '../utils/constants'
 import { Prompts } from '../utils/prompts'
+import {
+    ChatCompletionRequestNonStreaming,
+    ChatCompletionRequestStreaming
+} from "@mlc-ai/web-llm/lib/openai_api_protocols/chat_completion";
 
 export class WebLLMManager {
   private static instance: WebLLMManager | null = null
@@ -117,7 +121,7 @@ export class WebLLMManager {
 
       progressCallback?.(0)
 
-        const request = {
+        const request: ChatCompletionRequestStreaming = {
             messages: [
                 {
                     role: 'system',
