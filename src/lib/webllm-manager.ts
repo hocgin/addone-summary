@@ -117,21 +117,23 @@ export class WebLLMManager {
 
       progressCallback?.(0)
 
-      const chunks = await this.engine.chat.completions.create({
-        messages: [
-          {
-            role: 'system',
-            content: Prompts.System.DEFAULT
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        // max_tokens: 1000,
-        temperature: 0.7,
-        stream: true
-      })
+        const request = {
+            messages: [
+                {
+                    role: 'system',
+                    content: Prompts.System.DEFAULT
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            // max_tokens: 1000,
+            temperature: 0.7,
+            stream: true
+        };
+        console.log('request', JSON.stringify(request));
+        const chunks = await this.engine.chat.completions.create(request)
 
       let fullResponse = ''
       let chunkCount = 0
