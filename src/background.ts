@@ -241,30 +241,36 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
           }
         }
 
-        // 3. 获取当前活动标签页
+        // 3. 获取目标标签页
         let activeTab = null
-        if (sender.tab) {
-            // 从标签页的 popup 或 content script 发送的消息
-            activeTab = sender.tab
+        const targetTabId = message.tabId  // 获取指定的标签页 ID
+
+        if (targetTabId) {
+          // 如果指定了标签页 ID，直接使用
+          activeTab = await chrome.tabs.get(targetTabId).catch(() => null)
+          console.log('[Background] 使用指定标签页:', targetTabId)
+        } else if (sender.tab) {
+          // 从标签页的 popup 或 content script 发送的消息
+          activeTab = sender.tab
         } else {
-            // 从 Side Panel 或其他地方发送的消息，需要获取当前活动标签页
-            // 先尝试获取所有窗口，然后找到最近活动的窗口
-            const windows = await chrome.windows.getAll({ populate: true })
-            // 找到最近聚焦的窗口
-            const lastFocusedWindow = windows.find(w => w.focused)
-            // 或者最后一个窗口
-            const targetWindow = lastFocusedWindow || windows[windows.length - 1]
+          // 从 Side Panel 或其他地方发送的消息，需要获取当前活动标签页
+          // 先尝试获取所有窗口，然后找到最近活动的窗口
+          const windows = await chrome.windows.getAll({ populate: true })
+          // 找到最近聚焦的窗口
+          const lastFocusedWindow = windows.find(w => w.focused)
+          // 或者最后一个窗口
+          const targetWindow = lastFocusedWindow || windows[windows.length - 1]
 
-            if (targetWindow && targetWindow.tabs) {
-                // 找到该窗口中活动的标签页
-                activeTab = targetWindow.tabs.find(t => t.active)
-            }
+          if (targetWindow && targetWindow.tabs) {
+            // 找到该窗口中活动的标签页
+            activeTab = targetWindow.tabs.find(t => t.active)
+          }
 
-            // 如果还是找不到，尝试直接查询当前窗口的活动标签页
-            if (!activeTab) {
-                const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-                activeTab = tabs[0]
-            }
+          // 如果还是找不到，尝试直接查询当前窗口的活动标签页
+          if (!activeTab) {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+            activeTab = tabs[0]
+          }
         }
 
         if (!activeTab || !activeTab.id) {

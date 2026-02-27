@@ -14,6 +14,7 @@ interface PageInfo {
   title: string
   url: string
   isSupported: boolean
+  tabId?: number
 }
 
 function SidePanelApp() {
@@ -59,9 +60,9 @@ function SidePanelApp() {
       setProgress(message.progress)
       if (message.stage) setStage(message.stage)
     }
-  }, [status, isModelLoaded])
+  }, [])
 
-  const handleSummarize = async () => {
+  const handleSummarize = async (specificTabId?: number) => {
     setStatus('loading')
     setProgress(0)
     setMessage('正在初始化 AI 模型...')
@@ -70,15 +71,58 @@ function SidePanelApp() {
     setError('')
 
     try {
-      console.log('发送 SUMMARIZE_PAGE 请求')
-      const response = await chrome.runtime.sendMessage({
+      // 如果没有指定标签页，获取当前活动标签页
+      let targetTabId = specificTabId
+      if (!targetTabId) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (tabs[0]?.id) {
+          targetTabId = tabs[0].id
+            const url = tabs[0].url || ''
+            // 检查是否是受支持的 URL
+            const isSupported = url.startsWith('http://') || url.startsWith('https://')
+
+            setPageInfo({
+                tabId: tabs[0].id,
+                title: tabs[0].title || '未知页面',
+                url,
+                isSupported
+            })
+
+            // 如果页面不支持，设置错误状态
+            if (!isSupported) {
+                setError('当前页面不支持内容分析。请在普通的网页（如新闻、博客等）上使用此功能。\n\n支持的页面：以 http:// 或 https:// 开头的网页')
+                setStatus('error')
+            }
+        }
+      }
+
+      console.log('发送 SUMMARIZE_PAGE 请求，标签页 ID:', targetTabId)
+
+      // 只传递有定义的字段，避免序列化问题
+      const message: { type: string; tabId?: number } = {
         type: 'SUMMARIZE_PAGE'
-      })
+      }
+      if (targetTabId !== undefined) {
+        message.tabId = targetTabId
+      }
+
+      const response = await chrome.runtime.sendMessage(message)
 
       console.log('收到响应:', response)
 
       if (response?.success) {
-        setSummary(response.data)
+        // 只提取需要的字段，确保可序列化
+        const summaryWithTabInfo: StructuredSummary = {
+          abstract: response.data.abstract,
+          keyPoints: Array.isArray(response.data.keyPoints) ? response.data.keyPoints : [],
+          topics: Array.isArray(response.data.topics) ? response.data.topics : [],
+          sentiment: response.data.sentiment || 'neutral',
+          confidence: typeof response.data.confidence === 'number' ? response.data.confidence : 0.5,
+          tabId: targetTabId,
+          pageTitle: pageInfo.title,
+          pageUrl: pageInfo.url
+        }
+        setSummary(summaryWithTabInfo)
         setIsModelLoaded(true)
         setStatus('done')
       } else {
@@ -93,7 +137,7 @@ function SidePanelApp() {
     } catch (err) {
       console.error('请求失败:', err)
       const errorMsg = err instanceof Error ? err.message : '未知错误'
-      
+
       // 处理不支持的 URL 协议
       if (errorMsg.includes('不支持的 URL 协议')) {
         setError('无法在当前页面生成摘要。请在普通的网页（如 http/https）上使用此功能。')
@@ -124,27 +168,6 @@ function SidePanelApp() {
             setIsModelLoaded(true)
           }
         })
-      }
-    })
-
-    // 获取当前活动标签页信息
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        const url = tabs[0].url || ''
-        // 检查是否是受支持的 URL
-        const isSupported = url.startsWith('http://') || url.startsWith('https://')
-
-        setPageInfo({
-          title: tabs[0].title || '未知页面',
-          url,
-          isSupported
-        })
-
-        // 如果页面不支持，设置错误状态
-        if (!isSupported) {
-          setError('当前页面不支持内容分析。请在普通的网页（如新闻、博客等）上使用此功能。\n\n支持的页面：以 http:// 或 https:// 开头的网页')
-          setStatus('error')
-        }
       }
     })
 
@@ -215,7 +238,7 @@ function SidePanelApp() {
 
       {status === 'idle' && !needsSetup && (
         <WelcomeView
-          onStart={handleSummarize}
+          onStart={() => handleSummarize()}
           isModelLoaded={isModelLoaded}
           canStart={onboardingCompleted && pageInfo.isSupported}
           isPageSupported={pageInfo.isSupported}
@@ -225,10 +248,14 @@ function SidePanelApp() {
         <LoadingView progress={progress} message={message} stage={stage} details={details} />
       )}
       {status === 'done' && summary && (
-        <SummaryView data={summary} onReset={handleReset} onRetry={handleSummarize} />
+        <SummaryView
+          data={summary}
+          onReset={handleReset}
+          onRetry={() => handleSummarize(pageInfo.tabId)}
+        />
       )}
       {status === 'error' && (
-        <ErrorView error={error} onRetry={handleSummarize} />
+        <ErrorView error={error} onRetry={() => handleSummarize(pageInfo.tabId)} />
       )}
     </div>
   )

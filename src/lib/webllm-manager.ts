@@ -151,11 +151,12 @@ export class WebLLMManager {
           }
         ],
         temperature: 0.3,  // 降低温度以获得更确定性的输出
+        max_tokens: 128000,
         stream: true,
-          response_format: {
+        response_format: {
               type: "json_object",
               schema: schema,
-          } as webllm.ResponseFormat,
+        } as webllm.ResponseFormat,
       };
 
       console.log('[WebLLM] 请求配置:', {

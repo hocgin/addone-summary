@@ -4,6 +4,9 @@ export interface StructuredSummary {
   topics: string[]
   sentiment: 'positive' | 'neutral' | 'negative'
   confidence: number
+  tabId?: number  // 记录来源标签页 ID
+  pageTitle?: string  // 记录页面标题
+  pageUrl?: string  // 记录页面 URL
 }
 
 /**
@@ -72,6 +75,7 @@ export interface ExtractionResult {
 
 export interface SummarizeRequest {
   type: 'SUMMARIZE_PAGE'
+  tabId?: number  // 可选的标签页 ID，用于重试时指定目标标签页
 }
 
 export interface CheckModelStatusRequest {
