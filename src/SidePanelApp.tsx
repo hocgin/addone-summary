@@ -10,6 +10,11 @@ import './App.css'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
+interface PageInfo {
+  title: string
+  url: string
+}
+
 function SidePanelApp() {
   const [status, setStatus] = useState<Status>('idle')
   const [summary, setSummary] = useState<StructuredSummary | null>(null)
@@ -29,6 +34,7 @@ function SidePanelApp() {
   const listenerRef = useRef<((message: ProgressUpdate | any) => void) | null>(null)
 
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
+  const [pageInfo, setPageInfo] = useState<PageInfo>({ title: '', url: '' })
 
   const handleProgressMessage = useCallback((message: ProgressUpdate | any) => {
     if (message.type === 'PROGRESS_UPDATE') {
@@ -120,6 +126,16 @@ function SidePanelApp() {
       }
     })
 
+    // 获取当前活动标签页信息
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        setPageInfo({
+          title: tabs[0].title || '未知页面',
+          url: tabs[0].url || ''
+        })
+      }
+    })
+
     // 移除旧的监听器
     if (listenerRef.current) {
       chrome.runtime.onMessage.removeListener(listenerRef.current)
@@ -175,10 +191,20 @@ function SidePanelApp() {
 
   return (
     <div className="app-container">
+      {/* 显示页面标题 */}
+      {pageInfo.title && (
+        <div className="page-info">
+          <div className="page-title" title={pageInfo.url}>
+            <span className="page-icon">📄</span>
+            {pageInfo.title}
+          </div>
+        </div>
+      )}
+
       {status === 'idle' && !needsSetup && (
-        <WelcomeView 
-          onStart={handleSummarize} 
-          isModelLoaded={isModelLoaded} 
+        <WelcomeView
+          onStart={handleSummarize}
+          isModelLoaded={isModelLoaded}
           canStart={onboardingCompleted}
         />
       )}
