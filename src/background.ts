@@ -210,7 +210,7 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
   // 7. 处理页面摘要
   if (message.type === 'SUMMARIZE_PAGE') {
     console.log('[Background] 处理 SUMMARIZE_PAGE')
-    
+
     // 使用立即执行的异步函数来处理逻辑
     ;(async () => {
       try {
@@ -230,7 +230,7 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
 
         if (!statusResponse || !statusResponse.isReady) {
           console.log('[Background] 模型未就绪，尝试自动初始化...')
-          
+
           // 尝试初始化
           const initResponse = await chrome.runtime.sendMessage({
             type: 'INITIALIZE_MODEL'
@@ -245,13 +245,14 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
         // 优先使用消息发送者的标签页（如果是从 Side Panel 发送的），或者当前窗口的活动标签页
         let activeTab = null
         if (sender.tab) {
+            console.log("sender", sender)
             activeTab = sender.tab
         } else {
             // 如果是从 Side Panel 发送，sender.tab 可能为空
             // 我们需要找到与 Side Panel 关联的标签页
             // Side Panel 是全局的还是特定标签页的？目前 manifest 配置是全局的（没有 tabId）
             // 但我们实际上是在特定标签页打开的
-            
+
             // 尝试查询当前活动窗口的活动标签页
             const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
             if (tabs.length > 0) {
@@ -277,7 +278,7 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
           console.error('[Background] 提取内容失败 (sendMessage error):', err)
           // 如果 content script 未加载，尝试注入
           console.log('[Background] 尝试注入 content script...')
-          
+
           // 检查 URL 是否支持注入
           if (!activeTab.url?.startsWith('http')) {
             throw new Error('无法在当前页面生成摘要（不支持的 URL 协议）')
@@ -290,10 +291,10 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
             console.error('注入脚本失败:', e)
             throw e
           })
-          
+
           // 等待脚本执行和监听器注册
           await new Promise(resolve => setTimeout(resolve, 500))
-          
+
           // 再次尝试发送消息
           try {
             extractionResponse = await chrome.tabs.sendMessage(activeTab.id, {
@@ -339,7 +340,7 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
         } as SummarizeResponse)
       }
     })()
-    
+
     return true
   }
 
@@ -353,7 +354,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     try {
       // 设置点击图标打开 Side Panel
       await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-      
+
       await chrome.tabs.create({
         url: chrome.runtime.getURL('src/welcome.html'),
         active: true
@@ -376,7 +377,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.action.onClicked.addListener(async (_tab) => {
   const result = await chrome.storage.local.get(['onboardingCompleted'])
-  
+
   if (!result.onboardingCompleted) {
     // 尚未完成初始化，打开引导页
     // 注意：由于设置了 openPanelOnActionClick: true，SidePanel 也会打开
