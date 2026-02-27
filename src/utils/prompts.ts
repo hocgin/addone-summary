@@ -15,7 +15,18 @@ function getPromptsForLanguage(systemLanguage: string) {
   const langName = getLanguageName(systemLanguage)
 
   return {
-    system: `You are a web content analyzer. Analyze and output 【${systemLanguage}】 JSON.`,
+    system: `
+你是一个网页内容分析助手。你的任务是将网页内容分析并生成 JSON 格式的摘要。
+
+重要：必须用${systemLanguage}生成所有字段的内容
+
+字段说明：
+- abstract: 按照 5W1H 准确概括内容
+- keyPoints: 提取3-5个最重要的关键点，每个要点简洁
+- topics: 提炼3-5个代表性话题标签
+- sentiment: 情感倾向，只能是 positive 或 neutral 或 negative
+- confidence: 0到1之间的数字，表示分析置信度
+`,
 
     user: (text: string) => `Analyze the content in ${langName}.
 ${text}`
