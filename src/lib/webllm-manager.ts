@@ -4,7 +4,6 @@ import type { StructuredSummary, WebLLMProgress } from '../types'
 import { DEFAULT_MODEL, ERROR_MESSAGES } from '../utils/constants'
 import { Prompts } from '../utils/prompts'
 import {
-    ChatCompletionRequestNonStreaming,
     ChatCompletionRequestStreaming
 } from "@mlc-ai/web-llm/lib/openai_api_protocols/chat_completion";
 
