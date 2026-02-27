@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Popup 进度展示 - WebLLM-X</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      padding: 20px;
+    }
+
+    .demo-container {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .demo-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .popup-frame {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+
+    .loading-view {
+      padding: 32px 24px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e5e7eb;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 24px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1f2937;
+      margin: 0 0 8px;
+    }
+
+    .loading-message {
+      font-size: 14px;
+      color: #6b7280;
+      margin: 0 0 8px;
+    }
+
+    .loading-stage {
+      font-size: 12px;
+      color: #9ca3af;
+      margin: 0 0 24px;
+      font-weight: 500;
+    }
+
+    .progress-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: #6366f1;
+      min-width: 40px;
+    }
+
+    .progress-details {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      font-size: 13px;
+      color: #374151;
+      font-weight: 600;
+    }
+
+    .loading-steps {
+      display: flex;
+      justify-content: space-around;
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.4;
+      transition: opacity 0.3s;
+    }
+
+    .step.active {
+      opacity: 1;
+    }
+
+    .step-icon {
+      font-size: 24px;
+    }
+
+    .step-text {
+      font-size: 12px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+
+    .scenario-selector {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .scenario-btn {
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6b7280;
+      background: white;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .scenario-btn:hover {
+      border-color: #6366f1;
+      color: #6366f1;
+    }
+
+    .scenario-btn.active {
+      background: #6366f1;
+      border-color: #6366f1;
+      color: white;
+    }
+
+    .info-box {
+      background: #eef2ff;
+      border-left: 4px solid #6366f1;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+
+    .info-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #4338ca;
+      margin-bottom: 8px;
+    }
+
+    .info-text {
+      font-size: 13px;
+      color: #4338ca;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <h1 class="demo-title">Popup 进度展示演示</h1>
+
+    <div class="scenario-selector">
+      <button class="scenario-btn active" data-scenario="0">场景 1: 初始化</button>
+      <button class="scenario-btn" data-scenario="1">场景 2: 下载中</button>
+      <button class="scenario-btn" data-scenario="2">场景 3: 编译中</button>
+      <button class="scenario-btn" data-scenario="3">场景 4: 准备完成</button>
+      <button class="scenario-btn" data-scenario="4">场景 5: 生成摘要</button>
+    </div>
+
+    <div class="info-box" id="infoBox">
+      <div class="info-title">场景 1: 初始化环境 (0-10%)</div>
+      <div class="info-text">模型初始化的最早阶段，检查 WebGPU 支持并创建 GPU 上下文。此阶段通常很快完成。</div>
+    </div>
+
+    <div class="popup-frame">
+      <div class="loading-view">
+        <div class="spinner"></div>
+        <h2 class="loading-title">AI 正在分析中</h2>
+        <p class="loading-message" id="loadingMessage">加载模型中... 5%</p>
+        <p class="loading-stage" id="loadingStage">初始化 WebGPU 环境</p>
+
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 5%"></div>
+          </div>
+          <span class="progress-text" id="progressText">5%</span>
+        </div>
+
+        <div class="progress-details" id="progressDetails">
+          <div class="detail-item">
+            <span class="detail-label">已下载</span>
+            <span class="detail-value">50 MB</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">下载速度</span>
+            <span class="detail-value">--</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">剩余时间</span>
+            <span class="detail-value">--</span>
+          </div>
+        </div>
+
+        <div class="loading-steps" id="loadingSteps">
+          <div class="step active">
+            <span class="step-icon">⚙️</span>
+            <span class="step-text">初始化模型</span>
+          </div>
+          <div class="step">
+            <span class="step-icon">📄</span>
+            <span class="step-text">提取内容</span>
+          </div>
+          <div class="step">
+            <span class="step-icon">🤖</span>
+            <span class="step-text">生成摘要</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const scenarios = [
+      {
+        title: '场景 1: 初始化环境 (0-10%)',
+        text: '模型初始化的最早阶段，检查 WebGPU 支持并创建 GPU 上下文。此阶段通常很快完成。',
+        progress: 5,
+        message: '加载模型中... 5%',
+        stage: '初始化 WebGPU 环境',
+        details: { downloaded: '50 MB', speed: '--', remaining: '--' },
+        steps: [true, false, false]
+      },
+      {
+        title: '场景 2: 下载模型权重 (20-50%)',
+        text: '从 CDN 下载模型权重文件。这是最耗时的阶段，取决于网络速度。模型大小约 1GB。',
+        progress: 45,
+        message: '加载模型中... 45%',
+        stage: '下载模型权重文件',
+        details: { downloaded: '450 MB', speed: '2.3 MB/s', remaining: '240秒' },
+        steps: [true, false, false]
+      },
+      {
+        title: '场景 3: 编译模型 (50-80%)',
+        text: '将下载的模型编译为 WebGPU 格式。此阶段在本地 GPU 上执行，耗时取决于设备性能。',
+        progress: 65,
+        message: '加载模型中... 65%',
+        stage: '编译模型到 WebGPU',
+        details: { downloaded: '1000 MB', speed: '--', remaining: '60秒' },
+        steps: [true, false, false]
+      },
+      {
+        title: '场景 4: 准备推理引擎 (80-100%)',
+        text: '准备推理引擎，初始化完成。此时模型已加载到内存，可以开始推理。',
+        progress: 95,
+        message: '加载模型中... 95%',
+        stage: '准备推理引擎',
+        details: { downloaded: '1000 MB', speed: '--', remaining: '5秒' },
+        steps: [true, false, false]
+      },
+      {
+        title: '场景 5: 生成摘要 (50-100%)',
+        text: '模型初始化完成后，提取页面内容并生成摘要。此阶段显示摘要生成进度。',
+        progress: 75,
+        message: '生成摘要中...',
+        stage: '生成摘要',
+        details: {},
+        steps: [true, true, true]
+      }
+    ]
+
+    const buttons = document.querySelectorAll('.scenario-btn')
+    const infoBox = document.getElementById('infoBox')
+    const loadingMessage = document.getElementById('loadingMessage')
+    const loadingStage = document.getElementById('loadingStage')
+    const progressFill = document.getElementById('progressFill')
+    const progressText = document.getElementById('progressText')
+    const progressDetails = document.getElementById('progressDetails')
+    const loadingSteps = document.getElementById('loadingSteps')
+
+    function updateScenario(index) {
+      const scenario = scenarios[index]
+
+      // 更新信息框
+      infoBox.innerHTML = `
+        <div class="info-title">${scenario.title}</div>
+        <div class="info-text">${scenario.text}</div>
+      `
+
+      // 更新进度
+      loadingMessage.textContent = scenario.message
+      loadingStage.textContent = scenario.stage
+      progressFill.style.width = `${scenario.progress}%`
+      progressText.textContent = `${scenario.progress}%`
+
+      // 更新详情
+      const detailItems = progressDetails.querySelectorAll('.detail-item')
+      detailItems[0].querySelector('.detail-value').textContent = scenario.details.downloaded || '--'
+      detailItems[1].querySelector('.detail-value').textContent = scenario.details.speed || '--'
+      detailItems[2].querySelector('.detail-value').textContent = scenario.details.remaining || '--'
+
+      // 显示/隐藏详情区域
+      progressDetails.style.display = scenario.details.downloaded ? 'grid' : 'none'
+
+      // 更新步骤
+      const steps = loadingSteps.querySelectorAll('.step')
+      steps.forEach((step, i) => {
+        step.classList.toggle('active', scenario.steps[i])
+      })
+
+      // 更新按钮状态
+      buttons.forEach((btn, i) => {
+        btn.classList.toggle('active', i === index)
+      })
+    }
+
+    buttons.forEach((btn, index) => {
+      btn.addEventListener('click', () => updateScenario(index))
+    })
+
+    // 初始化第一个场景
+    updateScenario(0)
+  </script>
+</body>
+</html>

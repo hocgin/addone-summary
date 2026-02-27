@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置向导 - WebLLM-X</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .onboarding-container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 100%;
+      min-height: 600px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .progress-bar {
+      display: flex;
+      padding: 20px 30px;
+      gap: 8px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .progress-step {
+      flex: 1;
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 2px;
+      transition: background 0.3s;
+    }
+
+    .progress-step.active {
+      background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+    }
+
+    .content {
+      flex: 1;
+      padding: 40px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .step-icon {
+      font-size: 64px;
+      margin-bottom: 24px;
+    }
+
+    .step-icon.success {
+      animation: scaleIn 0.5s ease;
+    }
+
+    .step-icon.error {
+      animation: shake 0.5s ease;
+    }
+
+    @keyframes scaleIn {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+
+    .step-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+      margin: 0 0 12px;
+    }
+
+    .step-description {
+      font-size: 14px;
+      color: #6b7280;
+      margin: 0 0 32px;
+      line-height: 1.6;
+    }
+
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 32px;
+      width: 100%;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: #f9fafb;
+      border-radius: 12px;
+      text-align: left;
+    }
+
+    .feature-icon {
+      font-size: 24px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .feature-text {
+      font-size: 14px;
+      color: #374151;
+      font-weight: 500;
+    }
+
+    .info-box {
+      width: 100%;
+      padding: 20px;
+      background: #f3f4f6;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    .info-box.error {
+      background: #fef2f2;
+      border-left: 4px solid #ef4444;
+    }
+
+    .info-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin: 0 0 12px;
+    }
+
+    .info-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .info-list li {
+      position: relative;
+      padding-left: 20px;
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .info-list li::before {
+      content: '•';
+      position: absolute;
+      left: 6px;
+      color: #6366f1;
+      font-weight: bold;
+    }
+
+    .info-list ol {
+      padding-left: 0;
+      counter-reset: step-counter;
+    }
+
+    .info-list ol li {
+      counter-increment: step-counter;
+      padding-left: 32px;
+    }
+
+    .info-list ol li::before {
+      content: counter(step-counter) '.';
+      position: absolute;
+      left: 8px;
+      font-weight: 600;
+    }
+
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .primary-button {
+      width: 100%;
+      padding: 14px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .primary-button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+    }
+
+    .primary-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .secondary-button {
+      width: 100%;
+      padding: 14px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #6b7280;
+      background: white;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .secondary-button:hover {
+      border-color: #6366f1;
+      color: #6366f1;
+    }
+
+    .loading-spinner {
+      width: 64px;
+      height: 64px;
+      border: 6px solid #e5e7eb;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .progress-section {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      margin-bottom: 32px;
+    }
+
+    .progress-bar-large {
+      flex: 1;
+      height: 12px;
+      background: #e5e7eb;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .progress-fill-large {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+      border-radius: 6px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-percent {
+      font-size: 18px;
+      font-weight: 700;
+      color: #6366f1;
+      min-width: 50px;
+    }
+
+    .download-info {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 16px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .info-label {
+      font-size: 12px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .info-value {
+      font-size: 16px;
+      color: #374151;
+      font-weight: 600;
+    }
+
+    .tips-box {
+      width: 100%;
+      padding: 16px;
+      background: #eff6ff;
+      border-radius: 8px;
+      border-left: 4px solid #3b82f6;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    .tips-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e40af;
+      margin: 0 0 8px;
+    }
+
+    .tips-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .tips-list li {
+      position: relative;
+      padding-left: 20px;
+      font-size: 13px;
+      color: #1e40af;
+      margin-bottom: 6px;
+    }
+
+    .tips-list li::before {
+      content: '💡';
+      position: absolute;
+      left: 0;
+    }
+
+    .success-animation {
+      margin-bottom: 32px;
+    }
+
+    .checkmark {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: white;
+      animation: scaleIn 0.5s ease;
+    }
+
+    .step {
+      display: none;
+      width: 100%;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    .download-stage {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .stage-label {
+      color: #6b7280;
+      font-weight: 500;
+    }
+
+    .stage-value {
+      color: #374151;
+      font-weight: 600;
+    }
+
+    .download-details {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      font-size: 15px;
+      color: #374151;
+      font-weight: 600;
+    }
+
+    .steps-timeline {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding: 0 8px;
+    }
+
+    .timeline-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      opacity: 0.3;
+      transition: all 0.3s;
+    }
+
+    .timeline-step.active {
+      opacity: 1;
+    }
+
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      transition: all 0.3s;
+    }
+
+    .timeline-step.active .timeline-dot {
+      background: #6366f1;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+    }
+
+    .timeline-text {
+      font-size: 11px;
+      color: #6b7280;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    /* 错误显示样式 */
+    .error-section {
+      margin-top: 32px;
+      padding: 24px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 12px;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .error-section .error-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .error-section h3 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #dc2626;
+      margin: 0 0 12px;
+    }
+
+    .error-section .error-message {
+      font-size: 14px;
+      color: #991b1b;
+      margin: 0 0 16px;
+    }
+
+    .error-section .error-details {
+      text-align: left;
+      font-size: 13px;
+      color: #7f1d1d;
+      padding: 16px;
+      background: #fff;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .error-section .error-details p {
+      margin: 0 0 8px;
+    }
+
+    .error-section .error-details ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .error-section .error-details li {
+      margin: 4px 0;
+    }
+
+    .error-section .error-hint {
+      font-size: 13px;
+      color: #991b1b;
+      margin: 0 0 16px;
+    }
+
+    .error-section .retry-button {
+      padding: 12px 24px;
+      background: #dc2626;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .error-section .retry-button:hover {
+      background: #b91c1c;
+      transform: translateY(-1px);
+    }
+
+    .error-section .retry-button:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="onboarding-container">
+    <div class="progress-bar">
+      <div class="progress-step active" id="progress-1"></div>
+      <div class="progress-step" id="progress-2"></div>
+      <div class="progress-step" id="progress-3"></div>
+      <div class="progress-step" id="progress-4"></div>
+    </div>
+
+    <div class="content">
+      <!-- 步骤 1: 欢迎 -->
+      <div class="step active" id="step-1">
+        <div class="step-icon">🎉</div>
+        <h2 class="step-title">欢迎使用 WebLLM-X</h2>
+        <p class="step-description">
+          本地 AI 网页内容总结工具，无需联网，保护隐私
+        </p>
+
+        <div class="feature-list">
+          <div class="feature-item">
+            <span class="feature-icon">✨</span>
+            <span class="feature-text">本地处理，数据不上传</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">⚡</span>
+            <span class="feature-text">智能提取关键信息</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">🎯</span>
+            <span class="feature-text">结构化摘要生成</span>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <p class="info-title">首次使用需要：</p>
+          <ul class="info-list">
+            <li>检查设备是否支持 WebGPU</li>
+            <li>下载 AI 模型文件（约 1GB）</li>
+            <li>初始化推理引擎</li>
+          </ul>
+        </div>
+
+        <button class="primary-button" id="start-setup-btn">
+          开始设置
+        </button>
+      </div>
+
+      <!-- 步骤 2: 检查结果 -->
+      <div class="step" id="step-2">
+        <div class="step-icon" id="check-icon">⏳</div>
+        <h2 class="step-title" id="check-title">检查中...</h2>
+        <p class="step-description" id="check-desc">正在检测 WebGPU 支持</p>
+
+        <div class="info-box" id="check-info" style="display: none;">
+          <p class="info-title" id="check-info-title"></p>
+          <ul class="info-list" id="check-info-list"></ul>
+        </div>
+
+        <div class="button-group" id="check-buttons" style="display: none;">
+          <button class="primary-button" id="check-next-btn">
+            立即下载模型
+          </button>
+          <button class="secondary-button" id="skip-btn">
+            稍后再说
+          </button>
+        </div>
+      </div>
+
+      <!-- 步骤 3: 下载模型 -->
+      <div class="step" id="step-3">
+        <div class="loading-spinner"></div>
+        <h2 class="step-title">正在下载 AI 模型</h2>
+        <p class="step-description" id="download-status">
+          首次使用需要下载模型文件，请耐心等待...
+        </p>
+
+        <div class="download-stage" id="download-stage-box">
+          <span class="stage-label">当前阶段：</span>
+          <span class="stage-value" id="download-stage">准备中...</span>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-bar-large">
+            <div class="progress-fill-large" id="download-progress" style="width: 0%"></div>
+          </div>
+          <span class="progress-percent" id="download-percent">0%</span>
+        </div>
+
+        <div class="download-details">
+          <div class="detail-item">
+            <span class="detail-label">已下载</span>
+            <span class="detail-value" id="downloaded-size">--</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">总大小</span>
+            <span class="detail-value" id="total-size">~1000 MB</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">下载速度</span>
+            <span class="detail-value" id="download-speed">--</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">剩余时间</span>
+            <span class="detail-value" id="remaining-time">--</span>
+          </div>
+        </div>
+
+        <div class="steps-timeline">
+          <div class="timeline-step" id="timeline-step-1">
+            <div class="timeline-dot"></div>
+            <div class="timeline-text">初始化 WebGPU 环境</div>
+          </div>
+          <div class="timeline-step" id="timeline-step-2">
+            <div class="timeline-dot"></div>
+            <div class="timeline-text">加载模型配置</div>
+          </div>
+          <div class="timeline-step" id="timeline-step-3">
+            <div class="timeline-dot"></div>
+            <div class="timeline-text">下载模型文件</div>
+          </div>
+          <div class="timeline-step" id="timeline-step-4">
+            <div class="timeline-dot"></div>
+            <div class="timeline-text">编译模型</div>
+          </div>
+          <div class="timeline-step" id="timeline-step-5">
+            <div class="timeline-dot"></div>
+            <div class="timeline-text">准备完成</div>
+          </div>
+        </div>
+
+        <div class="tips-box">
+          <p class="tips-title">提示：</p>
+          <ul class="tips-list">
+            <li>下载期间可以继续浏览其他网页</li>
+            <li>模型会自动缓存，下次无需重新下载</li>
+            <li>如果下载失败，可以稍后重试</li>
+          </ul>
+        </div>
+
+        <button class="secondary-button" id="background-download-btn">
+          后台下载
+        </button>
+      </div>
+
+      <!-- 步骤 4: 完成 -->
+      <div class="step" id="step-4">
+        <div class="success-animation">
+          <div class="checkmark">✓</div>
+        </div>
+        <h2 class="step-title">设置完成！</h2>
+        <p class="step-description">
+          模型已准备就绪，现在可以开始使用 AI 总结功能了。
+        </p>
+
+        <div class="info-box">
+          <p class="info-title">如何使用：</p>
+          <ol class="info-list">
+            <li>浏览任意网页</li>
+            <li>点击工具栏中的扩展图标</li>
+            <li>点击"开始分析"按钮</li>
+            <li>查看 AI 生成的摘要</li>
+          </ol>
+        </div>
+
+        <button class="primary-button" id="finish-btn">
+          开始使用
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="onboarding.js"></script>
+</body>
+</html>

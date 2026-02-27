@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "name": "网页内容总结 - WebLLM-X",
+  "version": "0.1.0",
+  "description": "使用本地 AI 智能分析当前网页内容，生成结构化摘要",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  },
+  "offscreen": {
+    "page": "src/offscreen.html"
+  },
+  "sandbox": {
+    "pages": ["src/sandbox.html"]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-eval' 'unsafe-eval'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:"
+  },
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content-scripts/extractor.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/welcome.html",
+        "src/onboarding.html",
+        "src/onboarding.js",
+        "src/content-scripts/extractor.ts",
+        "src/offscreen.html",
+        "src/sandbox.html",
+        "diagnose.html"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

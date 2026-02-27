@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebLLM-X 环境诊断</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 24px;
+    }
+    h2 {
+      color: #555;
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    .result {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .result.pass {
+      background: #d4edda;
+      color: #155724;
+      border-left: 4px solid #28a745;
+    }
+    .result.fail {
+      background: #f8d7da;
+      color: #721c24;
+      border-left: 4px solid #dc3545;
+    }
+    .result.warn {
+      background: #fff3cd;
+      color: #856404;
+      border-left: 4px solid #ffc107;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid #17a2b8;
+      margin-top: 20px;
+    }
+    code {
+      background: #f8f9fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔍 WebLLM-X 环境诊断</h1>
+    <div id="results"></div>
+  </div>
+
+  <script>
+    const results = document.getElementById('results')
+
+    function addResult(type, title, message) {
+      const div = document.createElement('div')
+      div.className = `result ${type}`
+      div.innerHTML = `<strong>${title}</strong><br>${message}`
+      results.appendChild(div)
+    }
+
+    // 检查 Chrome 版本
+    const chromeMatch = navigator.userAgent.match(/Chrome\/(\d+)\./)
+    const chromeVersion = chromeMatch ? parseInt(chromeMatch[1]) : 0
+
+    if (chromeVersion >= 109) {
+      addResult('pass', '✅ Chrome 版本', `您的 Chrome 版本是 ${chromeVersion}，满足要求（需要 109+）`)
+    } else if (chromeVersion > 0) {
+      addResult('fail', '❌ Chrome 版本过低', `您的 Chrome 版本是 ${chromeVersion}，请升级到 109 或更高版本`)
+    } else {
+      addResult('warn', '⚠️ 无法检测 Chrome 版本', '您可能不是使用 Chrome 浏览器')
+    }
+
+    // 检查 WebGPU
+    if (typeof GPU !== 'undefined') {
+      addResult('pass', '✅ WebGPU 支持', '您的浏览器支持 WebGPU')
+    } else {
+      addResult('fail', '❌ WebGPU 不支持', 'WebGPU 不可用，需要 Chrome 113+ 并启用 WebGPU')
+    }
+
+    // 检查 chrome.offscreen API
+    if (typeof chrome !== 'undefined' && chrome.offscreen) {
+      addResult('pass', '✅ Offscreen API', 'chrome.offscreen API 可用')
+    } else if (typeof chrome !== 'undefined') {
+      addResult('fail', '❌ Offscreen API', 'chrome.offscreen API 不可用，需要 Chrome 109+')
+    } else {
+      addResult('fail', '❌ Chrome API', 'Chrome API 不可用，请确保在 Chrome 扩展环境中运行')
+    }
+
+    // 检查 manifest 配置
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.getManifest().then(manifest => {
+        if (manifest.offscreen) {
+          addResult('pass', '✅ Manifest 配置', `offscreen 配置存在: ${manifest.offscreen.page}`)
+        } else {
+          addResult('fail', '❌ Manifest 配置', 'manifest.json 中缺少 offscreen 配置')
+        }
+      }).catch(() => {
+        addResult('warn', '⚠️ Manifest', '无法读取 manifest.json')
+      })
+    }
+
+    // 总结
+    const summary = document.createElement('div')
+    summary.className = 'info'
+    summary.innerHTML = `
+      <strong>💡 下一步操作：</strong><br><br>
+      1. 如果 Chrome 版本过低，请升级到最新版本<br>
+      2. 如果 Offscreen API 不可用，但版本 >= 109，请检查扩展是否正确加载<br>
+      3. 打开控制台查看详细错误信息<br>
+      <br>
+      <strong>Chrome 下载：</strong> <a href="https://www.google.com/chrome/" target="_blank">https://www.google.com/chrome/</a>
+    `
+    results.appendChild(summary)
+  </script>
+</body>
+</html>
