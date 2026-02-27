@@ -2,10 +2,9 @@
  * 根据用户系统语言获取提示词
  */
 function getPromptsForLanguage(systemLanguage: string) {
-
-  // 英文系统（及其他）
   return {
-    system: `You are a web content analyzer. Analyze content in English and output JSON.
+    system: `You are a web content analyzer. Analyze content in ${systemLanguage} and output JSON.`,
+    user: (text: string) => `Analyze content in ${systemLanguage} and output JSON.
 
 JSON format:
 {
@@ -16,25 +15,10 @@ JSON format:
   "confidence": 0.8
 }
 
-Requirement: All fields in English, output JSON only.
-对话内容实用${systemLanguage}语言`,
-
-    user: (text: string) => `Analyze content in English and output JSON.
-
-<json>
-{
-  "abstract": "English summary",
-  "keyPoints": ["English point 1", "English point 2"],
-  "topics": ["English topic 1", "English topic 2"],
-  "sentiment": "neutral",
-  "confidence": 0.7
-}
-</json>
-
 Content:
 ${text}
 
-Requirement: Analyze in English, output JSON only.`
+Requirement: Analyze in ${systemLanguage}, output JSON only.`
   }
 }
 
