@@ -1,6 +1,7 @@
 import * as webllm from '@mlc-ai/web-llm'
 import type { StructuredSummary, WebLLMProgress } from '../types'
-import { DEFAULT_MODEL, SUMMARY_PROMPT, ERROR_MESSAGES } from '../utils/constants'
+import { DEFAULT_MODEL, ERROR_MESSAGES } from '../utils/constants'
+import { Prompts } from '../utils/prompts'
 
 export class WebLLMManager {
   private static instance: WebLLMManager | null = null
@@ -111,7 +112,7 @@ export class WebLLMManager {
     }
 
     try {
-      const prompt = SUMMARY_PROMPT.replace('{text}', text)
+      const prompt = Prompts.User.SUMMARIZE(text)
 
       progressCallback?.(0)
 
@@ -119,7 +120,7 @@ export class WebLLMManager {
         messages: [
           {
             role: 'system',
-            content: '你是一个专业的网页内容分析助手，擅长提取关键信息和生成结构化摘要。'
+            content: Prompts.System.DEFAULT
           },
           {
             role: 'user',
@@ -173,7 +174,7 @@ export class WebLLMManager {
       return {
         abstract: parsed.abstract || '',
         keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
-        topics: Array.isArray(parsed.topics) ? parsed.topics : [],
+        topics: Array.isArray(parsed.topics) ? Array.from(new Set(parsed.topics)) : [],
         sentiment: ['positive', 'neutral', 'negative'].includes(parsed.sentiment)
           ? parsed.sentiment
           : 'neutral',
