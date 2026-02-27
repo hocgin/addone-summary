@@ -15,7 +15,7 @@ function getPromptsForLanguage(systemLanguage: string) {
   const langName = getLanguageName(systemLanguage)
 
   return {
-    system: `You are a web content analyzer. Analyze and output JSON.`,
+    system: `You are a web content analyzer. Analyze and output 【${systemLanguage}】 JSON.`,
 
     user: (text: string) => `Analyze the content in ${langName}.
 ${text}`
