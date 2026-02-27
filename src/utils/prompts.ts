@@ -9,7 +9,7 @@ function getPromptsForLanguage(_language: string) {
 
         user: (text: string) => `分析下面的内容，生成 JSON 格式的中文摘要。
 
-返回格式参考例子：
+返回格式参考：
 {
   "abstract": "按照 5W1H 准确概括内容",
   "keyPoints": ["要点1", "要点2", "要点3"],
