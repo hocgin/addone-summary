@@ -187,17 +187,27 @@ export class WebLLMManager {
   }
 
   /**
-   * 步骤1：从 markdown 代码块提取 JSON
+   * 步骤1：从标签或 markdown 代码块提取 JSON
    */
   private extractJSONFromMarkdown(response: string): { success: boolean; data?: any } {
     try {
       const trimmed = response.trim()
 
-      // 匹配 ```json...``` 或 ```...```
-      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i
-      const match = trimmed.match(codeBlockRegex)
-
+      // 优先匹配 <json>...</json> 标签
+      const tagRegex = /<json>\s*([\s\S]*?)\s*<\/json>/i
+      let match = trimmed.match(tagRegex)
       if (match && match[1]) {
+        console.log('[ExtractJSON] 找到 <json> 标签')
+        const extracted = match[1].trim()
+        const parsed = JSON.parse(jsonrepair(extracted))
+        return { success: true, data: parsed }
+      }
+
+      // 其次匹配 ```json...``` 或 ```...```
+      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i
+      match = trimmed.match(codeBlockRegex)
+      if (match && match[1]) {
+        console.log('[ExtractJSON] 找到 markdown 代码块')
         const extracted = match[1].trim()
         const parsed = JSON.parse(jsonrepair(extracted))
         return { success: true, data: parsed }
@@ -205,7 +215,7 @@ export class WebLLMManager {
 
       return { success: false }
     } catch (error) {
-      console.log('[ExtractJSONFromMarkdown] 失败:', error instanceof Error ? error.message : 'Unknown error')
+      console.log('[ExtractJSON] 失败:', error instanceof Error ? error.message : 'Unknown error')
       return { success: false }
     }
   }
