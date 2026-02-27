@@ -77,8 +77,8 @@ async function handleSummarize(text: string, sendResponse: (response: any) => vo
       }).catch(() => {})
     })
 
-      console.log('text', text)
-      console.log('summary', summary)
+      console.log('text = ', text)
+      console.log('summary = ', summary)
     log('摘要生成完成', 'success')
     sendResponse({ success: true, data: summary })
   } catch (error) {
