@@ -103,22 +103,19 @@ function SidePanelApp() {
       const completed = !!result.onboardingCompleted
       setOnboardingCompleted(completed)
       setNeedsSetup(!completed)
-      
+
       if (!completed) {
         // 如果未完成初始化，自动打开引导页
         chrome.tabs.create({
           url: chrome.runtime.getURL('src/onboarding.html')
         })
       } else {
-        // 检查模型状态
+        // 检查模型状态（但不自动开始分析）
         chrome.runtime.sendMessage({ type: 'CHECK_MODEL_STATUS' }, (response) => {
           setIsCheckingModel(false)
           if (response?.isModelLoaded) {
             setIsModelLoaded(true)
           }
-          
-          // 自动开始分析
-          handleSummarize()
         })
       }
     })
@@ -139,8 +136,7 @@ function SidePanelApp() {
         listenerRef.current = null
       }
     }
-  }, [handleProgressMessage]) // 注意：handleSummarize 没有包含在依赖中，可能需要优化，但 handleSummarize 依赖 status 等状态，可能引起死循环。
-  // 这里简化处理，handleSummarize 定义在 useEffect 外部，且不依赖 useEffect 内部变量（除了 setState）
+  }, [handleProgressMessage])
 
   const handleReset = () => {
     setStatus('idle')

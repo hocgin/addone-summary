@@ -242,68 +242,106 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
         }
 
         // 3. 获取当前活动标签页
-        // 优先使用消息发送者的标签页（如果是从 Side Panel 发送的），或者当前窗口的活动标签页
         let activeTab = null
         if (sender.tab) {
-            console.log("sender", sender)
+            // 从标签页的 popup 或 content script 发送的消息
             activeTab = sender.tab
         } else {
-            // 如果是从 Side Panel 发送，sender.tab 可能为空
-            // 我们需要找到与 Side Panel 关联的标签页
-            // Side Panel 是全局的还是特定标签页的？目前 manifest 配置是全局的（没有 tabId）
-            // 但我们实际上是在特定标签页打开的
+            // 从 Side Panel 或其他地方发送的消息，需要获取当前活动标签页
+            // 先尝试获取所有窗口，然后找到最近活动的窗口
+            const windows = await chrome.windows.getAll({ populate: true })
+            // 找到最近聚焦的窗口
+            const lastFocusedWindow = windows.find(w => w.focused)
+            // 或者最后一个窗口
+            const targetWindow = lastFocusedWindow || windows[windows.length - 1]
 
-            // 尝试查询当前活动窗口的活动标签页
-            const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
-            if (tabs.length > 0) {
+            if (targetWindow && targetWindow.tabs) {
+                // 找到该窗口中活动的标签页
+                activeTab = targetWindow.tabs.find(t => t.active)
+            }
+
+            // 如果还是找不到，尝试直接查询当前窗口的活动标签页
+            if (!activeTab) {
+                const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
                 activeTab = tabs[0]
-            } else {
-                // 降级：查询任何当前窗口的活动标签页
-                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-                activeTab = tab
             }
         }
 
-        if (!activeTab?.id) {
+        if (!activeTab || !activeTab.id) {
+          console.error('[Background] 无法获取当前标签页，sender:', sender)
           throw new Error('无法获取当前标签页')
         }
 
+        console.log('[Background] 目标标签页:', activeTab.id, activeTab.url)
+
         // 4. 提取页面内容
+        // 检查 URL 是否支持注入
+        const tabUrl = activeTab.url || ''
+        if (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) {
+          throw new Error('无法在当前页面生成摘要（不支持的 URL 协议，需要 http/https）')
+        }
+
+        // 检查是否是特殊的搜索页面（这些页面可能有严格的 CSP 策略）
+        const isSearchPage = /google\.|bing\.|baidu\.|duckduckgo\./i.test(tabUrl)
+        if (isSearchPage) {
+          console.warn('[Background] 检测到搜索页面，可能存在 CSP 限制')
+        }
+
         let extractionResponse = null
-        try {
-          extractionResponse = await chrome.tabs.sendMessage(activeTab.id, {
-            type: 'EXTRACT_CONTENT'
-          })
-        } catch (err) {
-          console.error('[Background] 提取内容失败 (sendMessage error):', err)
-          // 如果 content script 未加载，尝试注入
-          console.log('[Background] 尝试注入 content script...')
+        let lastError = null
 
-          // 检查 URL 是否支持注入
-          if (!activeTab.url?.startsWith('http')) {
-            throw new Error('无法在当前页面生成摘要（不支持的 URL 协议）')
-          }
-
-          await chrome.scripting.executeScript({
-            target: { tabId: activeTab.id },
-            files: ['content-script.js']
-          }).catch(e => {
-            console.error('注入脚本失败:', e)
-            throw e
-          })
-
-          // 等待脚本执行和监听器注册
-          await new Promise(resolve => setTimeout(resolve, 500))
-
-          // 再次尝试发送消息
+        // 尝试多次提取内容
+        for (let attempt = 1; attempt <= 3; attempt++) {
           try {
+            console.log(`[Background] 提取内容尝试 ${attempt}/3...`)
             extractionResponse = await chrome.tabs.sendMessage(activeTab.id, {
               type: 'EXTRACT_CONTENT'
             })
-          } catch (retryErr) {
-            console.error('[Background] 重试提取内容失败:', retryErr)
-            throw retryErr
+            console.log('[Background] 提取成功')
+            break
+          } catch (err) {
+            lastError = err
+            console.error(`[Background] 尝试 ${attempt} 失败:`, err)
+
+            // 如果是第一次失败，尝试注入 content script
+            if (attempt === 1) {
+              console.log('[Background] Content script 未加载，尝试注入...')
+              try {
+                await chrome.scripting.executeScript({
+                  target: { tabId: activeTab.id },
+                  files: ['content-script.js']
+                })
+                console.log('[Background] Content script 注入成功，等待初始化...')
+
+                // 等待脚本执行和监听器注册
+                await new Promise(resolve => setTimeout(resolve, 2000))
+
+                // 验证脚本是否真的加载了
+                try {
+                  await chrome.tabs.sendMessage(activeTab.id, { type: 'PING' })
+                  console.log('[Background] Content script 已就绪')
+                } catch (pingErr) {
+                  console.warn('[Background] Content script 响应验证失败，继续尝试...')
+                }
+              } catch (injectErr) {
+                console.error('[Background] 注入脚本失败:', injectErr)
+
+                // 检查是否是搜索页面
+                if (isSearchPage) {
+                  throw new Error('搜索页面（如 Google、百度）可能有严格的限制，无法注入脚本。请尝试在普通网页上使用此功能。')
+                }
+                throw new Error('无法注入 content script，请刷新页面后重试')
+              }
+            } else {
+              // 后续重试之间也等待一下
+              await new Promise(resolve => setTimeout(resolve, 800))
+            }
           }
+        }
+
+        if (!extractionResponse || !extractionResponse.text) {
+          console.error('[Background] 所有尝试均失败，最后错误:', lastError)
+          throw new Error(ERROR_MESSAGES.EXTRACTION_FAILED)
         }
 
         if (!extractionResponse || !extractionResponse.text) {
@@ -371,11 +409,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 chrome.runtime.onStartup.addListener(async () => {
   console.log('WebLLM-X Extension started')
-  // 确保在每次启动时也设置行为，以防万一
-  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 })
 
-chrome.action.onClicked.addListener(async (_tab) => {
+chrome.action.onClicked.addListener(async (tab) => {
   const result = await chrome.storage.local.get(['onboardingCompleted'])
 
   if (!result.onboardingCompleted) {
@@ -387,5 +423,19 @@ chrome.action.onClicked.addListener(async (_tab) => {
       active: true
     })
   }
-  // 如果已完成初始化，SidePanel 会自动打开（由 setPanelBehavior 控制）
+  if (!tab.url) return;
+  const url = new URL(tab.url);
+  if (url.origin) {
+    await chrome.sidePanel.setOptions({
+      tabId: tab.id,
+      path: 'src/sidepanel.html',
+      enabled: true
+    });
+  } else {
+    // Disables the side panel on all other sites
+    await chrome.sidePanel.setOptions({
+      tabId: tab.id,
+      enabled: false
+    });
+  }
 })

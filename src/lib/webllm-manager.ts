@@ -156,29 +156,244 @@ export class WebLLMManager {
   }
 
   private parseSummary(response: string): StructuredSummary {
-    try {
-      const parsed = JSON.parse(jsonrepair(response)) as any
+    const parseStartTime = Date.now()
+    console.log('[ParseSummary] 开始解析，原始响应长度:', response.length)
 
-      return {
-        abstract: parsed.abstract || '',
-        keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
-        topics: Array.isArray(parsed.topics) ? Array.from(new Set(parsed.topics)) : [],
-        sentiment: ['positive', 'neutral', 'negative'].includes(parsed.sentiment)
-          ? parsed.sentiment
-          : 'neutral',
-        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5
+    // 第一步：从 markdown 代码块提取 JSON
+    const step1Result = this.extractJSONFromMarkdown(response)
+    if (step1Result.success) {
+      console.log('[ParseSummary] 步骤1成功 - 从代码块提取')
+      return this.finalizeSummary(step1Result.data!, response, parseStartTime, 'markdown-code-block')
+    }
+
+    // 第二步：使用花括号边界查找
+    const step2Result = this.findJSONBoundaries(response)
+    if (step2Result.success) {
+      console.log('[ParseSummary] 步骤2成功 - 花括号边界查找')
+      return this.finalizeSummary(step2Result.data!, response, parseStartTime, 'brace-boundaries')
+    }
+
+    // 第三步：使用 jsonrepair 尝试修复并解析
+    console.log('[ParseSummary] 步骤3 - 尝试 jsonrepair 修复')
+    const step3Result = this.attemptJsonRepair(response)
+    if (step3Result.success) {
+      console.log('[ParseSummary] 步骤3成功 - jsonrepair 修复')
+      return this.finalizeSummary(step3Result.data!, response, parseStartTime, 'jsonrepair')
+    }
+
+    // 所有方法都失败，使用降级策略
+    console.warn('[ParseSummary] 所有解析方法失败，使用降级策略')
+    return this.createFallbackSummary(response)
+  }
+
+  /**
+   * 步骤1：从 markdown 代码块提取 JSON
+   */
+  private extractJSONFromMarkdown(response: string): { success: boolean; data?: any } {
+    try {
+      const trimmed = response.trim()
+
+      // 匹配 ```json...``` 或 ```...```
+      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i
+      const match = trimmed.match(codeBlockRegex)
+
+      if (match && match[1]) {
+        const extracted = match[1].trim()
+        const parsed = JSON.parse(jsonrepair(extracted))
+        return { success: true, data: parsed }
       }
+
+      return { success: false }
     } catch (error) {
-      console.error('Failed to parse summary:', error)
-      console.log('Raw response:', response)
-      return {
-        abstract: response.replace(/```(?:json)?|```/g, '').trim(),
-        keyPoints: [],
-        topics: [],
-        sentiment: 'neutral',
-        confidence: 0.3
+      console.log('[ExtractJSONFromMarkdown] 失败:', error instanceof Error ? error.message : 'Unknown error')
+      return { success: false }
+    }
+  }
+
+  /**
+   * 步骤2：智能查找 JSON 边界
+   */
+  private findJSONBoundaries(response: string): { success: boolean; data?: any } {
+    try {
+      const trimmed = response.trim()
+      const start = trimmed.indexOf('{')
+      const end = trimmed.lastIndexOf('}')
+
+      if (start === -1 || end === -1 || end <= start) {
+        return { success: false }
+      }
+
+      // 提取花括号内的内容
+      let extracted = trimmed.slice(start, end + 1)
+
+      // 尝试平衡花括号（处理嵌套情况）
+      extracted = this.balanceBraces(extracted)
+
+      const parsed = JSON.parse(jsonrepair(extracted))
+      return { success: true, data: parsed }
+    } catch (error) {
+      console.log('[FindJSONBoundaries] 失败:', error instanceof Error ? error.message : 'Unknown error')
+      return { success: false }
+    }
+  }
+
+  /**
+   * 步骤3：使用 jsonrepair 尝试修复
+   */
+  private attemptJsonRepair(response: string): { success: boolean; data?: any } {
+    try {
+      // 先清理一些常见的格式问题
+      let cleaned = response.trim()
+        .replace(/^[^{]*/, '') // 移除开头的非JSON内容
+        .replace(/[^}]*$/, '') // 移除结尾的非JSON内容
+
+      const repaired = jsonrepair(cleaned)
+      const parsed = JSON.parse(repaired)
+      return { success: true, data: parsed }
+    } catch (error) {
+      console.log('[AttemptJsonRepair] 失败:', error instanceof Error ? error.message : 'Unknown error')
+      return { success: false }
+    }
+  }
+
+  /**
+   * 平衡花括号，处理嵌套 JSON
+   */
+  private balanceBraces(json: string): string {
+    let depth = 0
+    let lastValidIndex = -1
+
+    for (let i = 0; i < json.length; i++) {
+      const char = json[i]
+      if (char === '{') {
+        depth++
+      } else if (char === '}') {
+        depth--
+        if (depth === 0) {
+          lastValidIndex = i
+        }
       }
     }
+
+    // 如果找到了平衡的结尾，使用它；否则使用原始字符串
+    return lastValidIndex > 0 ? json.slice(0, lastValidIndex + 1) : json
+  }
+
+  /**
+   * 验证摘要结构的完整性
+   */
+  private validateSummaryStructure(data: any): boolean {
+    const hasAbstract = typeof data.abstract === 'string'
+    const hasKeyPoints = Array.isArray(data.keyPoints)
+    const hasTopics = Array.isArray(data.topics)
+    const hasSentiment = ['positive', 'neutral', 'negative'].includes(data.sentiment)
+    const hasConfidence = typeof data.confidence === 'number'
+
+    const isValid = hasAbstract && hasKeyPoints && hasTopics && hasSentiment && hasConfidence
+
+    if (!isValid) {
+      console.log('[ValidateSummary] 验证失败:', {
+        hasAbstract,
+        hasKeyPoints,
+        hasTopics,
+        hasSentiment,
+        hasConfidence
+      })
+    }
+
+    return isValid
+  }
+
+  /**
+   * 最终化并规范化摘要
+   */
+  private finalizeSummary(
+    data: any,
+    rawResponse: string,
+    startTime: number,
+    parseMethod: string
+  ): StructuredSummary {
+    const elapsed = Date.now() - startTime
+    console.log(`[FinalizeSummary] 解析完成，方法: ${parseMethod}，耗时: ${elapsed}ms`)
+
+    // 验证结构
+    if (!this.validateSummaryStructure(data)) {
+      console.warn('[FinalizeSummary] 结构验证失败，使用降级策略')
+      return this.createFallbackSummary(rawResponse)
+    }
+
+    const summary: StructuredSummary = {
+      abstract: this.sanitizeString(data.abstract) || '',
+      keyPoints: this.sanitizeArray(data.keyPoints, 5),
+      topics: this.sanitizeArray(data.topics, 5),
+      sentiment: ['positive', 'neutral', 'negative'].includes(data.sentiment)
+        ? data.sentiment
+        : 'neutral',
+      confidence: this.clampNumber(data.confidence, 0, 1)
+    }
+
+    console.log('[FinalizeSummary] 最终摘要:', {
+      abstractLength: summary.abstract.length,
+      keyPointsCount: summary.keyPoints.length,
+      topicsCount: summary.topics.length,
+      sentiment: summary.sentiment,
+      confidence: summary.confidence
+    })
+
+    return summary
+  }
+
+  /**
+   * 创建降级摘要（当解析失败时）
+   */
+  private createFallbackSummary(rawResponse: string): StructuredSummary {
+    console.warn('[FallbackSummary] 创建降级摘要')
+
+    // 清理响应文本作为 abstract
+    const cleanedText = rawResponse
+      .replace(/```(?:json)?|```/g, '')
+      .replace(/\n+/g, ' ')
+      .trim()
+
+    const abstract = cleanedText.slice(0, 200)
+
+    console.log('[FallbackSummary] 使用清理后的文本作为摘要，长度:', abstract.length)
+
+    return {
+      abstract,
+      keyPoints: [],
+      topics: [],
+      sentiment: 'neutral',
+      confidence: 0.3
+    }
+  }
+
+  /**
+   * 清理字符串
+   */
+  private sanitizeString(value: any): string {
+    if (typeof value !== 'string') return ''
+    return value.trim().slice(0, 500) // 限制最大长度
+  }
+
+  /**
+   * 清理并限制数组
+   */
+  private sanitizeArray(value: any, maxItems: number): string[] {
+    if (!Array.isArray(value)) return []
+    return value
+      .filter(item => typeof item === 'string')
+      .map(item => item.trim())
+      .filter(item => item.length > 0)
+      .slice(0, maxItems)
+  }
+
+  /**
+   * 限制数字范围
+   */
+  private clampNumber(value: any, min: number, max: number): number {
+    if (typeof value !== 'number') return (min + max) / 2
+    return Math.max(min, Math.min(max, value))
   }
 
   isReady(): boolean {
