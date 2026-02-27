@@ -1,4 +1,5 @@
 import * as webllm from '@mlc-ai/web-llm'
+import { jsonrepair } from 'jsonrepair'
 import type { StructuredSummary, WebLLMProgress } from '../types'
 import { DEFAULT_MODEL, ERROR_MESSAGES } from '../utils/constants'
 import { Prompts } from '../utils/prompts'
@@ -156,20 +157,7 @@ export class WebLLMManager {
 
   private parseSummary(response: string): StructuredSummary {
     try {
-      let cleaned = response.trim()
-      
-      // 尝试提取 markdown 代码块内容
-      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i
-      const match = cleaned.match(codeBlockRegex)
-      
-      if (match && match[1]) {
-        cleaned = match[1].trim()
-      } else {
-        // 如果没有完整的代码块，尝试去除开头和结尾的标记
-        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-      }
-
-      const parsed = JSON.parse(cleaned)
+      const parsed = JSON.parse(jsonrepair(response)) as any
 
       return {
         abstract: parsed.abstract || '',

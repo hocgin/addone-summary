@@ -103,13 +103,13 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
   if (sender.url && sender.url.includes('offscreen.html')) {
     if (message.type === 'MODEL_PROGRESS') {
       chrome.runtime.sendMessage(message).catch(() => {
-        console.log('[Background] 转发进度消息失败（可能没有监听器）')
+        // 忽略错误
       })
     }
     // 不返回 true，因为不需要向 offscreen 发送响应
   }
 
-  console.log('[Background] 收到消息:', message.type)
+  // console.log('[Background] 收到消息:', message.type)
 
   // 2. 处理打开引导页面请求
   if (message.type === 'OPEN_ONBOARDING') {
@@ -242,7 +242,27 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
         }
 
         // 3. 获取当前活动标签页
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        // 优先使用消息发送者的标签页（如果是从 Side Panel 发送的），或者当前窗口的活动标签页
+        let activeTab = null
+        if (sender.tab) {
+            activeTab = sender.tab
+        } else {
+            // 如果是从 Side Panel 发送，sender.tab 可能为空
+            // 我们需要找到与 Side Panel 关联的标签页
+            // Side Panel 是全局的还是特定标签页的？目前 manifest 配置是全局的（没有 tabId）
+            // 但我们实际上是在特定标签页打开的
+            
+            // 尝试查询当前活动窗口的活动标签页
+            const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+            if (tabs.length > 0) {
+                activeTab = tabs[0]
+            } else {
+                // 降级：查询任何当前窗口的活动标签页
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+                activeTab = tab
+            }
+        }
+
         if (!activeTab?.id) {
           throw new Error('无法获取当前标签页')
         }
@@ -265,7 +285,7 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
 
           await chrome.scripting.executeScript({
             target: { tabId: activeTab.id },
-            files: ['src/content-scripts/extractor.ts']
+            files: ['content-script.js']
           }).catch(e => {
             console.error('注入脚本失败:', e)
             throw e
@@ -331,12 +351,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
   if (details.reason === 'install') {
     try {
+      // 设置点击图标打开 Side Panel
+      await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+      
       await chrome.tabs.create({
         url: chrome.runtime.getURL('src/welcome.html'),
         active: true
       })
     } catch (error) {
-      console.error('Failed to open welcome page:', error)
+      console.error('Failed to setup extension:', error)
     }
   }
 
@@ -345,16 +368,23 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 })
 
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
   console.log('WebLLM-X Extension started')
+  // 确保在每次启动时也设置行为，以防万一
+  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 })
 
-chrome.action.onClicked.addListener(async () => {
+chrome.action.onClicked.addListener(async (_tab) => {
   const result = await chrome.storage.local.get(['onboardingCompleted'])
+  
   if (!result.onboardingCompleted) {
+    // 尚未完成初始化，打开引导页
+    // 注意：由于设置了 openPanelOnActionClick: true，SidePanel 也会打开
+    // 我们可能需要在这里关闭它，或者引导页完成后自动处理
     chrome.tabs.create({
       url: chrome.runtime.getURL('src/onboarding.html'),
       active: true
     })
   }
+  // 如果已完成初始化，SidePanel 会自动打开（由 setPanelBehavior 控制）
 })

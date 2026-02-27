@@ -22,7 +22,8 @@ export default defineConfig({
         background: 'src/background.ts',
         offscreen: 'src/offscreen.html',
         'content-script': 'src/content-scripts/extractor.ts',
-        onboarding: 'src/onboarding.html'
+        onboarding: 'src/onboarding.html',
+        sidepanel: 'src/sidepanel.html'
       },
       output: {
         entryFileNames: '[name].js',

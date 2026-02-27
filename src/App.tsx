@@ -1,58 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { WelcomeView } from './components/WelcomeView'
-import { LoadingView } from './components/LoadingView'
-import { SummaryView } from './components/SummaryView'
-import { ErrorView } from './components/ErrorView'
 import { SetupPromptView } from './components/SetupPromptView'
-import { ERROR_MESSAGES } from './utils/constants'
-import type { StructuredSummary, ProgressUpdate } from './types'
 import './App.css'
 
-type Status = 'idle' | 'loading' | 'done' | 'error'
-
 function App() {
-  const [status, setStatus] = useState<Status>('idle')
-  const [summary, setSummary] = useState<StructuredSummary | null>(null)
-  const [progress, setProgress] = useState(0)
-  const [message, setMessage] = useState('')
-  const [stage, setStage] = useState('')
-  const [details, setDetails] = useState<{
-    downloaded?: string
-    total?: string
-    speed?: string
-    remaining?: string
-  }>({})
-  const [error, setError] = useState('')
-  const [isModelLoaded, setIsModelLoaded] = useState(false)
-  const [isCheckingModel, setIsCheckingModel] = useState(true)
-  const [needsSetup, setNeedsSetup] = useState(false)
-  const listenerRef = useRef<((message: ProgressUpdate | any) => void) | null>(null)
-
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
-
-  const handleProgressMessage = useCallback((message: ProgressUpdate | any) => {
-    if (message.type === 'PROGRESS_UPDATE') {
-      console.log('收到进度更新:', message)
-      setProgress(message.progress)
-      setMessage(message.message)
-      setStage(message.stage || '')
-      setDetails(message.details || {})
-    } else if (message.type === 'MODEL_DOWNLOAD_PROGRESS') {
-      console.log('收到模型下载进度:', message)
-      // 用于 onboarding 页面的下载进度
-    } else if (message.type === 'GENERATION_PROGRESS') {
-      console.log('收到生成进度:', message)
-      setProgress(message.progress)
-    } else if (message.type === 'MODEL_PROGRESS') {
-      // 收到模型初始化进度，显示加载界面
-      if (status === 'idle' && !isModelLoaded) {
-        setStatus('loading')
-        setMessage('正在初始化模型...')
-      }
-      setProgress(message.progress)
-      if (message.stage) setStage(message.stage)
-    }
-  }, [status, isModelLoaded])
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const [isCheckingModel, setIsCheckingModel] = useState(true)
+  const [isModelLoaded, setIsModelLoaded] = useState(false)
 
   useEffect(() => {
     // 检查 onboarding 状态
@@ -62,15 +17,6 @@ function App() {
       setNeedsSetup(!completed)
     })
 
-    // 移除旧的监听器
-    if (listenerRef.current) {
-      chrome.runtime.onMessage.removeListener(listenerRef.current)
-    }
-
-    // 注册新的监听器
-    listenerRef.current = handleProgressMessage
-    chrome.runtime.onMessage.addListener(handleProgressMessage)
-
     // 检查模型状态
     chrome.runtime.sendMessage({ type: 'CHECK_MODEL_STATUS' }, (response) => {
       setIsCheckingModel(false)
@@ -78,60 +24,20 @@ function App() {
         setIsModelLoaded(true)
       }
     })
+  }, [])
 
-    // 清理函数
-    return () => {
-      if (listenerRef.current) {
-        chrome.runtime.onMessage.removeListener(listenerRef.current)
-        listenerRef.current = null
-      }
+  const handleOpenSidePanel = async () => {
+    // 获取当前标签页
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (tab.id) {
+        // 打开侧边栏
+        await chrome.sidePanel.open({ tabId: tab.id });
+        // 发送开始摘要的消息
+        setTimeout(() => {
+            chrome.runtime.sendMessage({ type: 'START_SUMMARY' })
+        }, 500)
+        window.close()
     }
-  }, [handleProgressMessage])
-
-  const handleSummarize = async () => {
-    setStatus('loading')
-    setProgress(0)
-    setMessage('正在初始化 AI 模型...')
-    setStage('')
-    setDetails({})
-    setError('')
-
-    try {
-      console.log('发送 SUMMARIZE_PAGE 请求')
-      const response = await chrome.runtime.sendMessage({
-        type: 'SUMMARIZE_PAGE'
-      })
-
-      console.log('收到响应:', response)
-
-      if (response?.success) {
-        setSummary(response.data)
-        setIsModelLoaded(true)
-        setStatus('done')
-      } else {
-        if (response?.error === ERROR_MESSAGES.MODEL_NOT_READY) {
-          setNeedsSetup(true)
-          setStatus('idle')
-          return
-        }
-        setError(response?.error || '未知错误')
-        setStatus('error')
-      }
-    } catch (err) {
-      console.error('请求失败:', err)
-      setError(err instanceof Error ? err.message : '未知错误')
-      setStatus('error')
-    }
-  }
-
-  const handleReset = () => {
-    setStatus('idle')
-    setSummary(null)
-    setProgress(0)
-    setMessage('')
-    setStage('')
-    setDetails({})
-    setError('')
   }
 
   const openOnboarding = () => {
@@ -145,13 +51,13 @@ function App() {
     return (
       <div className="app-container checking">
         <div className="checking-spinner"></div>
-        <p>正在检查模型状态...</p>
+        <p>正在检查状态...</p>
       </div>
     )
   }
 
   // 如果需要设置，显示设置提示界面
-  if (needsSetup && status === 'idle') {
+  if (needsSetup) {
     return (
       <div className="app-container">
         <SetupPromptView onSetup={openOnboarding} />
@@ -161,22 +67,11 @@ function App() {
 
   return (
     <div className="app-container">
-      {status === 'idle' && !needsSetup && (
-        <WelcomeView 
-          onStart={handleSummarize} 
+       <WelcomeView 
+          onStart={handleOpenSidePanel} 
           isModelLoaded={isModelLoaded} 
           canStart={onboardingCompleted}
         />
-      )}
-      {status === 'loading' && (
-        <LoadingView progress={progress} message={message} stage={stage} details={details} />
-      )}
-      {status === 'done' && summary && (
-        <SummaryView data={summary} onReset={handleReset} />
-      )}
-      {status === 'error' && (
-        <ErrorView error={error} onRetry={handleSummarize} />
-      )}
     </div>
   )
 }
