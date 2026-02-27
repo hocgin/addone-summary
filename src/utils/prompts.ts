@@ -28,7 +28,7 @@ function getPromptsForLanguage(language: string) {
 - confidence: 0到1之间的数字，表示分析置信度
 
 内容：
-${text.slice(0, 8000)}
+${text}
 
 只返回 JSON，不要其他内容。结果用<json>和</json>标签包围。`
     }
@@ -59,7 +59,7 @@ Field descriptions:
 - confidence: A number between 0 and 1 indicating analysis confidence
 
 Content:
-${text.slice(0, 8000)}
+${text}
 
 Return JSON only, with no other content. Wrap the result in <json> and </json> tags.`
   }
