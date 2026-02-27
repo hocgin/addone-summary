@@ -1,0 +1,5 @@
+- [x] WebLLMManager `summarize` 方法能正确处理流式响应并解析 JSON
+- [x] Background `SUMMARIZE_PAGE` 能成功提取网页内容
+- [x] Background 能正确将内容转发给 Offscreen 并获取结果
+- [x] Popup 能接收到 `GENERATION_PROGRESS` 并更新进度条
+- [x] 最终能成功生成并展示网页摘要

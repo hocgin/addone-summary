@@ -1,133 +1,119 @@
+import { WebLLMManager } from './lib/webllm-manager'
+import type { WebLLMProgress } from './types'
+
 console.log('[Offscreen] Offscreen document loaded')
 
-// 获取 sandbox iframe 并设置正确的 URL
-const sandboxIframe = document.getElementById('sandbox-iframe') as HTMLIFrameElement
-sandboxIframe.src = chrome.runtime.getURL('src/sandbox.html')
-console.log('[Offscreen] Sandbox iframe URL:', sandboxIframe.src)
+const webllmManager = WebLLMManager.getInstance()
 
-// 等待 sandbox iframe 加载完成
-let sandboxReady = false
-let pendingResponse: ((response: any) => void) | null = null
-
-// 监听来自 sandbox iframe 的消息
-window.addEventListener('message', (event) => {
-  // 安全检查：确保消息来自 sandbox iframe
-  if (event.source !== sandboxIframe.contentWindow) return
-
-  const message = event.data
-  if (message.source !== 'webllm-sandbox') return
-
-  console.log('[Offscreen] 收到来自 Sandbox 的消息:', message.type)
-
-  // 处理 sandbox 的 READY 消息
-  if (message.type === 'READY') {
-    sandboxReady = true
-    console.log('[Offscreen] Sandbox iframe 已就绪')
-    return
+// 日志函数
+function log(message: string, _type: 'info' | 'error' | 'success' = 'info') {
+  console.log(`[Offscreen] ${message}`)
+  const statusEl = document.getElementById('status')
+  if (statusEl) {
+    statusEl.textContent = message
   }
+}
 
-  // 处理进度消息
-  if (message.type === 'PROGRESS') {
-    chrome.runtime.sendMessage({
-      type: 'MODEL_PROGRESS',
-      progress: message.progress,
-      stage: message.stage,
-      details: message.details
-    }).catch((err) => {
-      console.log('[Offscreen] 发送进度失败:', err)
+// 处理初始化
+async function handleInitializeModel(sendResponse: (response: any) => void) {
+  try {
+    log('开始初始化模型...', 'info')
+
+    if (typeof GPU === 'undefined') {
+      throw new Error('WebGPU 不可用')
+    }
+
+    log('WebGPU 可用，开始初始化...', 'success')
+
+    await webllmManager.initialize((progressReport: WebLLMProgress) => {
+      log(`进度: ${(progressReport.progress * 100).toFixed(1)}% - ${progressReport.stage || ''}`)
+
+      chrome.runtime.sendMessage({
+        type: 'MODEL_PROGRESS',
+        progress: progressReport.progress,
+        stage: progressReport.stage,
+        details: {
+          downloaded: progressReport.downloaded,
+          total: progressReport.total,
+          speed: progressReport.speed,
+          remaining: progressReport.remaining
+        }
+      }).catch((_err) => {
+        // 忽略发送失败（可能是 popup 关闭了）
+      })
     })
-    return
-  }
 
-  // 处理生成进度
-  if (message.type === 'GENERATION_PROGRESS') {
-    chrome.runtime.sendMessage({
-      type: 'GENERATION_PROGRESS',
-      progress: message.progress
-    }).catch(() => {})
-    return
-  }
+    log('模型初始化完成', 'success')
+    sendResponse({ success: true })
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    log(`初始化失败: ${errorMsg}`, 'error')
+    console.error('[Offscreen] 初始化失败:', error)
 
-  // 处理状态检查
-  if (message.type === 'STATUS') {
-    if (pendingResponse) {
-      pendingResponse(message)
-      pendingResponse = null
-    }
-    return
-  }
-
-  // 处理初始化结果
-  if (message.type === 'INIT_SUCCESS' || message.type === 'INIT_ERROR') {
-    if (pendingResponse) {
-      pendingResponse(message)
-      pendingResponse = null
-    }
-    return
-  }
-
-  // 处理摘要结果
-  if (message.type === 'SUMMARIZE_SUCCESS' || message.type === 'SUMMARIZE_ERROR') {
-    if (pendingResponse) {
-      pendingResponse(message)
-      pendingResponse = null
-    }
-    return
-  }
-})
-
-// 向 sandbox iframe 发送消息
-function sendToSandbox(type: string, data: any = {}): void {
-  if (!sandboxReady) {
-    console.log('[Offscreen] Sandbox 尚未就绪，等待...')
-    // 等待 sandbox 准备好
-    const checkReady = setInterval(() => {
-      if (sandboxReady) {
-        clearInterval(checkReady)
-        sandboxIframe.contentWindow?.postMessage({
-          source: 'webllm-extension',
-          type,
-          ...data
-        }, '*')
+    sendResponse({
+      success: false,
+      error: errorMsg,
+      details: {
+        message: errorMsg,
+        name: error instanceof Error ? error.name : undefined
       }
-    }, 100)
-    return
+    })
   }
+}
 
-  sandboxIframe.contentWindow?.postMessage({
-    source: 'webllm-extension',
-    type,
-    ...data
-  }, '*')
+// 处理摘要
+async function handleSummarize(text: string, sendResponse: (response: any) => void) {
+  try {
+    log('开始生成摘要...', 'info')
+
+    if (!webllmManager.isReady()) {
+      throw new Error('模型未初始化')
+    }
+
+    const summary = await webllmManager.summarize(text, (progress) => {
+      chrome.runtime.sendMessage({
+        type: 'GENERATION_PROGRESS',
+        progress
+      }).catch(() => {})
+    })
+
+    log('摘要生成完成', 'success')
+    sendResponse({ success: true, data: summary })
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    log(`生成失败: ${errorMsg}`, 'error')
+    console.error('[Offscreen] 生成失败:', error)
+
+    sendResponse({
+      success: false,
+      error: errorMsg
+    })
+  }
 }
 
 // 监听来自 background 的消息
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[Offscreen] 收到来自 Background 的消息:', message.type, '来自:', sender.url)
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  console.log('[Offscreen] 收到消息:', message.type)
 
   if (message.type === 'INITIALIZE_MODEL') {
-    console.log('[Offscreen] 转发 INITIALIZE_MODEL 到 Sandbox')
-    pendingResponse = sendResponse
-    sendToSandbox('INITIALIZE_MODEL')
+    handleInitializeModel(sendResponse)
     return true // 保持消息通道开放
   }
 
   if (message.type === 'SUMMARIZE') {
-    console.log('[Offscreen] 转发 SUMMARIZE 到 Sandbox')
-    pendingResponse = sendResponse
-    sendToSandbox('SUMMARIZE', { text: message.text })
+    handleSummarize(message.text, sendResponse)
     return true // 保持消息通道开放
   }
 
   if (message.type === 'CHECK_STATUS') {
-    console.log('[Offscreen] 转发 CHECK_STATUS 到 Sandbox')
-    pendingResponse = sendResponse
-    sendToSandbox('CHECK_STATUS')
-    return true // 保持消息通道开放
+    const status = {
+      isReady: webllmManager.isReady(),
+      progress: webllmManager.getInitProgress()
+    }
+    sendResponse(status)
+    return true
   }
 
-  console.log('[Offscreen] 未知消息类型:', message.type)
   return false
 })
 
-console.log('[Offscreen] 消息代理已设置')

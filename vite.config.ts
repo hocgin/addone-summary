@@ -21,7 +21,6 @@ export default defineConfig({
         popup: 'src/popup.html',
         background: 'src/background.ts',
         offscreen: 'src/offscreen.html',
-        sandbox: 'src/sandbox.html',
         'content-script': 'src/content-scripts/extractor.ts',
         onboarding: 'src/onboarding.html'
       },

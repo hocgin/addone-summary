@@ -200,18 +200,68 @@ chrome.runtime.onMessage.addListener(
     if (message.type === 'SUMMARIZE_PAGE') {
       console.log('[Background] 处理 SUMMARIZE_PAGE')
       try {
-        if (!checkWebGPUAvailability()) {
+        // 1. 确保 Offscreen document 存在
+        const offscreenReady = await ensureOffscreenDocument()
+        if (!offscreenReady) {
+          throw new Error('无法创建后台处理环境')
+        }
+
+        // 2. 检查模型状态
+        const statusResponse = await chrome.runtime.sendMessage({
+          type: 'CHECK_STATUS'
+        }).catch((err) => {
+          console.error('[Background] 检查模型状态失败:', err)
+          return null
+        })
+
+        if (!statusResponse || !statusResponse.isReady) {
           sendResponse({
             success: false,
-            error: ERROR_MESSAGES.WEBGPU_NOT_AVAILABLE
+            error: ERROR_MESSAGES.MODEL_NOT_READY
           } as SummarizeResponse)
           return true
         }
 
-        // TODO: 实现摘要生成逻辑
-        // 需要在 popup 页面中也创建沙盒 iframe
+        // 3. 获取当前活动标签页
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (!activeTab?.id) {
+          throw new Error('无法获取当前标签页')
+        }
 
-        throw new Error('摘要功能开发中，请先完成 onboarding')
+        // 4. 提取页面内容
+        const extractionResponse = await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'EXTRACT_CONTENT'
+        }).catch((err) => {
+          console.error('[Background] 提取内容失败:', err)
+          return null
+        }) as { type: string; text: string } | null
+
+        if (!extractionResponse || !extractionResponse.text) {
+          throw new Error(ERROR_MESSAGES.EXTRACTION_FAILED)
+        }
+
+        // 5. 发送摘要生成请求
+        const summarizeResponse = await chrome.runtime.sendMessage({
+          type: 'SUMMARIZE',
+          text: extractionResponse.text
+        }).catch((err) => {
+          console.error('[Background] 发送摘要请求失败:', err)
+          return { success: false, error: err.message }
+        })
+
+        // 6. 返回结果
+        if (summarizeResponse.success) {
+          sendResponse({
+            success: true,
+            data: summarizeResponse.data
+          } as SummarizeResponse)
+        } else {
+          sendResponse({
+            success: false,
+            error: summarizeResponse.error || ERROR_MESSAGES.GENERATION_FAILED
+          })
+        }
+
       } catch (error) {
         console.error('[Background] 摘要生成失败:', error)
         sendResponse({

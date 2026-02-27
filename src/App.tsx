@@ -4,6 +4,7 @@ import { LoadingView } from './components/LoadingView'
 import { SummaryView } from './components/SummaryView'
 import { ErrorView } from './components/ErrorView'
 import { SetupPromptView } from './components/SetupPromptView'
+import { ERROR_MESSAGES } from './utils/constants'
 import type { StructuredSummary, ProgressUpdate } from './types'
 import './App.css'
 
@@ -37,6 +38,9 @@ function App() {
     } else if (message.type === 'MODEL_DOWNLOAD_PROGRESS') {
       console.log('收到模型下载进度:', message)
       // 用于 onboarding 页面的下载进度
+    } else if (message.type === 'GENERATION_PROGRESS') {
+      console.log('收到生成进度:', message)
+      setProgress(message.progress)
     }
   }, [])
 
@@ -95,6 +99,11 @@ function App() {
         setIsModelLoaded(true)
         setStatus('done')
       } else {
+        if (response?.error === ERROR_MESSAGES.MODEL_NOT_READY) {
+          setNeedsSetup(true)
+          setStatus('idle')
+          return
+        }
         setError(response?.error || '未知错误')
         setStatus('error')
       }

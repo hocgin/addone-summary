@@ -4,24 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebLLM Offscreen</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-    #sandbox-iframe {
-      width: 100vw;
-      height: 100vh;
-      border: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-    }
-  </style>
 </head>
 <body>
-  <iframe id="sandbox-iframe"></iframe>
+  <div id="status"></div>
   <script type="module" src="./offscreen.ts"></script>
 </body>
 </html>

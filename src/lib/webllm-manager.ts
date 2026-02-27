@@ -132,11 +132,16 @@ export class WebLLMManager {
       })
 
       let fullResponse = ''
+      let chunkCount = 0
 
       for await (const chunk of chunks) {
         const content = chunk.choices[0]?.delta?.content || ''
         fullResponse += content
-        progressCallback?.(50)
+        chunkCount++
+        
+        // 估算进度，假设大概 50-100 个 chunk
+        const estimatedProgress = Math.min(Math.round(chunkCount * 1.5), 95)
+        progressCallback?.(estimatedProgress)
       }
 
       progressCallback?.(100)
@@ -150,10 +155,18 @@ export class WebLLMManager {
 
   private parseSummary(response: string): StructuredSummary {
     try {
-      const cleaned = response
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim()
+      let cleaned = response.trim()
+      
+      // 尝试提取 markdown 代码块内容
+      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i
+      const match = cleaned.match(codeBlockRegex)
+      
+      if (match && match[1]) {
+        cleaned = match[1].trim()
+      } else {
+        // 如果没有完整的代码块，尝试去除开头和结尾的标记
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+      }
 
       const parsed = JSON.parse(cleaned)
 
@@ -168,8 +181,9 @@ export class WebLLMManager {
       }
     } catch (error) {
       console.error('Failed to parse summary:', error)
+      console.log('Raw response:', response)
       return {
-        abstract: response.slice(0, 500),
+        abstract: response.replace(/```(?:json)?|```/g, '').trim().slice(0, 500),
         keyPoints: [],
         topics: [],
         sentiment: 'neutral',

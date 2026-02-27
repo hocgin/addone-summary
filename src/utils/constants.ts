@@ -37,5 +37,6 @@ export const ERROR_MESSAGES = {
   MODEL_LOAD_FAILED: '模型加载失败，请检查网络连接',
   EXTRACTION_FAILED: '页面内容提取失败',
   GENERATION_FAILED: '摘要生成失败',
-  UNKNOWN: '未知错误，请重试'
+  UNKNOWN: '未知错误，请重试',
+  MODEL_NOT_READY: 'MODEL_NOT_READY'
 } as const
