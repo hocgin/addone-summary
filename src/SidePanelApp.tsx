@@ -4,7 +4,8 @@ import { LoadingView } from './components/LoadingView'
 import { SummaryView } from './components/SummaryView'
 import { ErrorView } from './components/ErrorView'
 import { SetupPromptView } from './components/SetupPromptView'
-import { ERROR_MESSAGES } from './utils/constants'
+import { ModelSelector } from './components/ModelSelector'
+import { DEFAULT_MODEL, ERROR_MESSAGES } from './utils/constants'
 import type { StructuredSummary, ProgressUpdate } from './types'
 import './App.css'
 
@@ -38,6 +39,8 @@ function SidePanelApp() {
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
   const [pageInfo, setPageInfo] = useState<PageInfo>({ title: '', url: '', isSupported: true })
   const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState<string>('')  // 跟踪已分析的 URL
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL)
+  const [isSwitchingModel, setIsSwitchingModel] = useState(false)
 
   const handleProgressMessage = useCallback((message: ProgressUpdate | any) => {
     if (message.type === 'PROGRESS_UPDATE') {
@@ -167,11 +170,16 @@ function SidePanelApp() {
   }, [])
 
   useEffect(() => {
-    // 检查 onboarding 状态
-    chrome.storage.local.get(['onboardingCompleted'], (result) => {
+    // 检查 onboarding 状态和保存的模型选择
+    chrome.storage.local.get(['onboardingCompleted', 'selectedModel'], (result) => {
       const completed = !!result.onboardingCompleted
       setOnboardingCompleted(completed)
       setNeedsSetup(!completed)
+
+      // 读取用户选择的模型
+      if (result.selectedModel) {
+        setSelectedModel(result.selectedModel)
+      }
 
       if (!completed) {
         // 如果未完成初始化，自动打开引导页
@@ -261,6 +269,47 @@ function SidePanelApp() {
     })
   }
 
+  const handleModelChange = async (modelId: string) => {
+    console.log('[SidePanel] 切换模型:', modelId)
+
+    // 保存到 storage
+    chrome.storage.local.set({ selectedModel: modelId })
+
+    // 更新状态
+    setSelectedModel(modelId)
+
+    // 如果模型已加载，需要重新初始化
+    if (isModelLoaded) {
+      setIsSwitchingModel(true)
+      setStatus('loading')
+      setProgress(0)
+      setMessage('正在切换模型...')
+      setStage('')
+
+      try {
+        // 发送切换模型请求到 background
+        const response = await chrome.runtime.sendMessage({
+          type: 'SWITCH_MODEL',
+          modelId
+        })
+
+        if (response?.success) {
+          setIsModelLoaded(true)
+          setIsSwitchingModel(false)
+          setStatus('idle')
+          setMessage('')
+        } else {
+          throw new Error(response?.error || '模型切换失败')
+        }
+      } catch (error) {
+        console.error('[SidePanel] 模型切换失败:', error)
+        setError(error instanceof Error ? error.message : '模型切换失败')
+        setStatus('error')
+        setIsSwitchingModel(false)
+      }
+    }
+  }
+
   // 检查模型状态
   if (isCheckingModel) {
     return (
@@ -290,6 +339,15 @@ function SidePanelApp() {
             {pageInfo.title}
           </div>
         </div>
+      )}
+
+      {/* 模型选择器 */}
+      {status === 'idle' && !needsSetup && (
+        <ModelSelector
+          currentModel={selectedModel}
+          onModelChange={handleModelChange}
+          disabled={isSwitchingModel}
+        />
       )}
 
       {status === 'idle' && !needsSetup && (

@@ -196,6 +196,7 @@ export type ChromeMessage =
   | ModelProgressMessage
   | GenerationProgressMessage
   | InitializeModelMessage
+  | SwitchModelRequest
 
 export interface ExtractContentMessage {
   type: 'EXTRACT_CONTENT'
@@ -206,4 +207,37 @@ export interface ExtractedContent {
   text: string
   url: string
   title: string
+}
+
+/**
+ * 模型配置信息
+ */
+export interface ModelConfig {
+  id: string
+  name: string
+  description: string
+  size: string
+}
+
+/**
+ * 模型选择设置
+ */
+export interface ModelSettings {
+  selectedModel: string
+}
+
+/**
+ * 切换模型请求
+ */
+export interface SwitchModelRequest {
+  type: 'SWITCH_MODEL'
+  modelId: string
+}
+
+/**
+ * 切换模型响应
+ */
+export interface SwitchModelResponse {
+  success: boolean
+  error?: string
 }

@@ -11,7 +11,7 @@ import { Type, Static } from "@sinclair/typebox";
 export class WebLLMManager {
   private static instance: WebLLMManager | null = null
   private engine: webllm.MLCEngine | null = null
-  private readonly model: string
+  private model: string
   private isInitialized: boolean = false
   private initProgress: number = 0
   private progressStage: string = ''
@@ -21,11 +21,40 @@ export class WebLLMManager {
     this.model = model
   }
 
-  static getInstance(): WebLLMManager {
+  static getInstance(model?: string): WebLLMManager {
     if (!WebLLMManager.instance) {
-      WebLLMManager.instance = new WebLLMManager()
+      WebLLMManager.instance = new WebLLMManager(model)
     }
     return WebLLMManager.instance
+  }
+
+  /**
+   * 获取当前使用的模型
+   */
+  getModel(): string {
+    return this.model
+  }
+
+  /**
+   * 切换到新模型（需要重新初始化）
+   */
+  async switchModel(newModel: string, progressCallback?: (progress: WebLLMProgress) => void): Promise<void> {
+    console.log(`[WebLLM] 切换模型: ${this.model} -> ${newModel}`)
+
+    // 如果是同一个模型，跳过
+    if (this.model === newModel && this.isInitialized) {
+      console.log('[WebLLM] 模型相同且已初始化，跳过')
+      return
+    }
+
+    // 先卸载旧模型
+    if (this.isInitialized) {
+      await this.dispose()
+    }
+
+    // 更新模型并重新初始化
+    this.model = newModel
+    await this.initialize(progressCallback)
   }
 
   async initialize(progressCallback?: (progress: WebLLMProgress) => void): Promise<void> {

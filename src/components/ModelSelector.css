@@ -1,0 +1,128 @@
+.model-selector {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.model-selector-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.model-selector-button:hover:not(:disabled) {
+  border-color: #6366f1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
+}
+
+.model-selector-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.model-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.model-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.model-description {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.model-selector-arrow {
+  transition: transform 0.2s;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.model-selector-arrow.open {
+  transform: rotate(180deg);
+}
+
+.model-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.model-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.model-option:last-child {
+  border-bottom: none;
+}
+
+.model-option:hover {
+  background: #f9fafb;
+}
+
+.model-option.active {
+  background: #eef2ff;
+}
+
+.model-option-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
+}
+
+.model-option-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.model-option-desc {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.model-option-size {
+  font-size: 11px;
+  color: #9ca3af;
+  padding: 2px 6px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  margin-right: 8px;
+}
+
+.model-option-check {
+  color: #6366f1;
+  flex-shrink: 0;
+}

@@ -93,6 +93,43 @@ async function handleSummarize(text: string, sendResponse: (response: any) => vo
   }
 }
 
+// 处理模型切换
+async function handleSwitchModel(modelId: string, sendResponse: (response: any) => void) {
+  try {
+    log(`切换模型到: ${modelId}`, 'info')
+
+    await webllmManager.switchModel(modelId, (progressReport: WebLLMProgress) => {
+      log(`切换进度: ${(progressReport.progress * 100).toFixed(1)}% - ${progressReport.stage || ''}`)
+
+      chrome.runtime.sendMessage({
+        type: 'MODEL_PROGRESS',
+        progress: progressReport.progress,
+        stage: progressReport.stage,
+        details: {
+          downloaded: progressReport.downloaded,
+          total: progressReport.total,
+          speed: progressReport.speed,
+          remaining: progressReport.remaining
+        }
+      }).catch((_err) => {
+        // 忽略发送失败
+      })
+    })
+
+    log('模型切换完成', 'success')
+    sendResponse({ success: true })
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    log(`模型切换失败: ${errorMsg}`, 'error')
+    console.error('[Offscreen] 模型切换失败:', error)
+
+    sendResponse({
+      success: false,
+      error: errorMsg
+    })
+  }
+}
+
 // 监听来自 background 的消息
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   console.log('[Offscreen] 收到消息:', message.type)
@@ -110,9 +147,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'CHECK_STATUS') {
     const status = {
       isReady: webllmManager.isReady(),
-      progress: webllmManager.getInitProgress()
+      progress: webllmManager.getInitProgress(),
+      model: webllmManager.getModel()
     }
     sendResponse(status)
+    return true
+  }
+
+  if (message.type === 'SWITCH_MODEL') {
+    handleSwitchModel(message.modelId, sendResponse)
     return true
   }
 

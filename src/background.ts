@@ -207,6 +207,38 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
     return true
   }
 
+  // 6.5. 处理模型切换
+  if (message.type === 'SWITCH_MODEL') {
+    console.log('[Background] 处理模型切换请求:', message.modelId)
+
+    ensureOffscreenDocument().then(async (offscreenReady) => {
+      try {
+        if (!offscreenReady) {
+          sendResponse({
+            success: false,
+            error: '无法创建后台处理环境'
+          })
+          return
+        }
+
+        // 转发到 offscreen document
+        const response = await chrome.runtime.sendMessage({
+          type: 'SWITCH_MODEL',
+          modelId: message.modelId
+        })
+
+        sendResponse(response)
+      } catch (error) {
+        console.error('[Background] 模型切换失败:', error)
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : '模型切换失败'
+        })
+      }
+    })
+    return true
+  }
+
   // 7. 处理页面摘要
   if (message.type === 'SUMMARIZE_PAGE') {
     console.log('[Background] 处理 SUMMARIZE_PAGE')

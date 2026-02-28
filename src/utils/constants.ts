@@ -1,5 +1,38 @@
 export const DEFAULT_MODEL = 'Llama-3.2-1B-Instruct-q4f16_1-MLC'
 
+export const AVAILABLE_MODELS = [
+  {
+    id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',
+    name: 'Phi-3.5 Mini (1B)',
+    description: '最快，适合快速摘要',
+    size: '~0.8GB'
+  },
+  {
+    id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+    name: 'Llama 3.2 (1B)',
+    description: '快速，平衡性能',
+    size: '~0.8GB'
+  },
+  {
+    id: 'Qwen2-1.5B-Instruct-q4f16_1-MLC',
+    name: 'Qwen 2 (1.5B)',
+    description: '中文支持好',
+    size: '~1.0GB'
+  },
+  {
+    id: 'Gemma-2-2B-it-q4f16_1-MLC',
+    name: 'Gemma 2 (2B)',
+    description: '质量更高',
+    size: '~1.5GB'
+  },
+  {
+    id: 'Phi-3-mini-4k-instruct-q4f16_1-MLC',
+    name: 'Phi-3 Mini (3.8B)',
+    description: '最佳质量',
+    size: '~2.5GB'
+  }
+] as const
+
 export const MAX_TEXT_LENGTH = 10000
 
 export const UNWANTED_SELECTORS = [
