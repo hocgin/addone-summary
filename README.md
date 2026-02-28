@@ -320,11 +320,6 @@ export const Prompts = {
 - [Readability](https://github.com/mozilla/readability) - 网页内容提取
 - [Chrome Extension Samples](https://github.com/GoogleChrome/chrome-extensions-samples) - 扩展示例代码
 
-## 联系方式
-
-- 问题反馈: [GitHub Issues](https://github.com/yourusername/web-llm-x/issues)
-- 功能建议: [GitHub Discussions](https://github.com/yourusername/web-llm-x/discussions)
-
 ---
 
 **享受本地 AI 带来的智能网页分析体验！**
