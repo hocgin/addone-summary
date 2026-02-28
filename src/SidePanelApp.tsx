@@ -37,6 +37,7 @@ function SidePanelApp() {
 
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
   const [pageInfo, setPageInfo] = useState<PageInfo>({ title: '', url: '', isSupported: true })
+  const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState<string>('')  // 跟踪已分析的 URL
 
   const handleProgressMessage = useCallback((message: ProgressUpdate | any) => {
     if (message.type === 'PROGRESS_UPDATE') {
@@ -148,6 +149,23 @@ function SidePanelApp() {
     }
   }
 
+  // 获取当前活动标签页信息的函数
+  const updateCurrentTabInfo = useCallback(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        const url = tabs[0].url || ''
+        const isSupported = url.startsWith('http://') || url.startsWith('https://')
+
+        setPageInfo({
+          tabId: tabs[0].id,
+          title: tabs[0].title || '未知页面',
+          url,
+          isSupported
+        })
+      }
+    })
+  }, [])
+
   useEffect(() => {
     // 检查 onboarding 状态
     chrome.storage.local.get(['onboardingCompleted'], (result) => {
@@ -161,15 +179,32 @@ function SidePanelApp() {
           url: chrome.runtime.getURL('src/onboarding.html')
         })
       } else {
-        // 检查模型状态（但不自动开始分析）
+        // 检查模型状态
         chrome.runtime.sendMessage({ type: 'CHECK_MODEL_STATUS' }, (response) => {
           setIsCheckingModel(false)
           if (response?.isModelLoaded) {
             setIsModelLoaded(true)
           }
         })
+
+        // 获取当前标签页信息
+        updateCurrentTabInfo()
       }
     })
+
+    // 监听标签页激活事件
+    const onTabActivated = () => {
+      console.log('[SidePanel] 标签页切换，更新信息')
+      updateCurrentTabInfo()
+    }
+    chrome.tabs.onActivated.addListener(onTabActivated)
+
+    // 监听标签页更新事件
+    const onTabUpdated = () => {
+      console.log('[SidePanel] 标签页更新，刷新信息')
+      updateCurrentTabInfo()
+    }
+    chrome.tabs.onUpdated.addListener(onTabUpdated)
 
     // 移除旧的监听器
     if (listenerRef.current) {
@@ -186,8 +221,29 @@ function SidePanelApp() {
         chrome.runtime.onMessage.removeListener(listenerRef.current)
         listenerRef.current = null
       }
+      chrome.tabs.onActivated.removeListener(onTabActivated)
+      chrome.tabs.onUpdated.removeListener(onTabUpdated)
     }
-  }, [handleProgressMessage])
+  }, [handleProgressMessage, updateCurrentTabInfo])
+
+  // 自动分析：当 URL 变化且为网页时自动分析
+  useEffect(() => {
+    if (
+      pageInfo.url &&
+      pageInfo.url !== lastAnalyzedUrl &&
+      pageInfo.isSupported &&
+      pageInfo.tabId &&
+      status === 'idle'
+    ) {
+      console.log('[SidePanel] 检测到新网页，开始自动分析:', pageInfo.url)
+      const timer = setTimeout(() => {
+        handleSummarize(pageInfo.tabId)
+        setLastAnalyzedUrl(pageInfo.url)
+      }, 500)
+
+      return () => clearTimeout(timer)
+    }
+  }, [pageInfo.url, pageInfo.isSupported, pageInfo.tabId, status, lastAnalyzedUrl])
 
   const handleReset = () => {
     setStatus('idle')
