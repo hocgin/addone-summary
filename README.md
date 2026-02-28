@@ -37,8 +37,8 @@
 
 1. **下载扩展**
    ```bash
-   git clone https://github.com/yourusername/web-llm-x.git
-   cd web-llm-x
+   git clone https://github.com/hocgin/addone-summary
+   cd addone-summary
    ```
 
 2. **安装依赖**
@@ -119,7 +119,7 @@
 ### 项目结构
 
 ```
-web-llm-x/
+addone-summary/
 ├── src/
 │   ├── components/          # React 组件
 │   │   ├── WelcomeView.tsx
